@@ -63,26 +63,39 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
         for j in range(H):
             for s in range(num_sources):
                 for d in range(len(DIRECTIONS)):
-                    # Output flow always lower than zero
+                    # Output flow always lower or equal zero
                     solver.Add(f[i][j][s][d] <= large_M * (1 - b[i][j][d]))
                     for di in [DIRECTIONS.index(dir) for dir in BELT_INPUT_DIRECTIONS[DIRECTIONS[d]]]:
-                        # Input flow always greater than zero
+                        # Input flow always greater or equal zero
                         solver.Add(f[i][j][s][di] >= -large_M * (1 - b[i][j][d]))
 
     # 5. Flow constraints on adjacent cells
     for i in range(W):
         for j in range(H):
             for s in range(num_sources):
-                for d in range(len(DIRECTIONS)):
-                    # Flow into the cell must equal the flow out of the cell
-                    if i > 0:
-                        solver.Add(f[i][j][s][DIRECTIONS.index('W')] == - f[i-1][j][s][DIRECTIONS.index('E')])
-                    if i < W - 1:
-                        solver.Add(f[i][j][s][DIRECTIONS.index('E')] == - f[i+1][j][s][DIRECTIONS.index('W')])
-                    if j > 0:
-                        solver.Add(f[i][j][s][DIRECTIONS.index('S')] == - f[i][j-1][s][DIRECTIONS.index('N')])
-                    if j < H - 1:
-                        solver.Add(f[i][j][s][DIRECTIONS.index('N')] == - f[i][j+1][s][DIRECTIONS.index('S')])
+                # Flow into the cell must equal the flow out of the adjiacent cell
+                if i > 0:
+                    solver.Add(f[i][j][s][DIRECTIONS.index('W')] == - f[i-1][j][s][DIRECTIONS.index('E')])
+                if i < W - 1:
+                    solver.Add(f[i][j][s][DIRECTIONS.index('E')] == - f[i+1][j][s][DIRECTIONS.index('W')])
+                if j > 0:
+                    solver.Add(f[i][j][s][DIRECTIONS.index('S')] == - f[i][j-1][s][DIRECTIONS.index('N')])
+                if j < H - 1:
+                    solver.Add(f[i][j][s][DIRECTIONS.index('N')] == - f[i][j+1][s][DIRECTIONS.index('S')])
+
+    # 6. Zero flow constraints on border cells
+    for i in range(W):
+        for j in range(H):
+            for s in range(num_sources):
+                if i == 0 and not any([input[0] == i and input[1] == j and input[3] == s and input[2] == 'E' for input in input_flows]):
+                    print('HERE', i, j, s)
+                    solver.Add(f[i][j][s][DIRECTIONS.index('W')] == 0)
+                if i == W - 1 and not any([input[0] == i and input[1] == j and input[3] == s and input[2] == 'W' for input in input_flows]):
+                    solver.Add(f[i][j][s][DIRECTIONS.index('E')] == 0)
+                if j == 0 and not any([input[0] == i and input[1] == j and input[3] == s and input[2] == 'S' for input in input_flows]):
+                    solver.Add(f[i][j][s][DIRECTIONS.index('S')] == 0)
+                if j == H - 1 and not any([input[0] == i and input[1] == j and input[3] == s and input[2] == 'N' for input in input_flows]):
+                    solver.Add(f[i][j][s][DIRECTIONS.index('N')] == 0)
 
     # Input constraints
     for input in input_flows:
@@ -102,6 +115,8 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
         print(viz_belts(b, grid_size))
         print('occupied:')
         print(viz_occupied(x, grid_size))
+        # print('flows:')
+        # print(viz_flows(f, grid_size, num_sources))
         print(f'Minimum area: {solver.Objective().Value()}')
     else:
         print('No optimal solution found.')
@@ -128,7 +143,21 @@ def viz_belts(b, grid_size):
         result += '\n'
     return result
 
-solve_factorio_belt_balancer((2, 2), 1, [
-    (0, 0, 'N', 0, -1),
+def viz_flows(f, grid_size, num_flows):
+    H, W = grid_size
+    result = ''
+    # Iterate backward since Y axis is inverted
+    for j in range(H-1, -1, -1):
+        for i in range(W):
+            for d in range(len(DIRECTIONS)):
+                for s in range(num_flows):
+                    result += f"{i} {j} {s} {DIRECTIONS[d]} {f[i][j][s][d].solution_value()} "
+                result += ' '
+            result += '| '
+        result += '\n'
+    return result
+
+solve_factorio_belt_balancer((3, 3), 1, [
+    (0, 2, 'N', 0, -1),
     (0, 0, 'S', 0, 1),
 ])

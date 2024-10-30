@@ -44,6 +44,29 @@ class TestFactorioBalancer(unittest.TestCase):
             'vO\n' +
             'vO\n'
         )
+    def test_solve_factorio_belt_balancer_3_3_1_flow_down(self):
+        result = solve_factorio_belt_balancer((3, 3), 1, [
+            (0, 2, 'N', 0, 1),
+            (0, 0, 'S', 0, -1),
+        ])
+        # One belt that goes down
+        self.assertEqual(result,
+            'vOO\n' +
+            'vOO\n' +
+            'vOO\n'
+        )
+
+    def test_solve_factorio_belt_balancer_3_3_1_flow_up(self):
+        result = solve_factorio_belt_balancer((3, 3), 1, [
+            (0, 2, 'N', 0, -1),
+            (0, 0, 'S', 0, 1),
+        ])
+        # One belt that goes down
+        self.assertEqual(result,
+            '^OO\n' +
+            '^OO\n' +
+            '^OO\n'
+        )
 
     def test_solve_factorio_belt_balancer_2_2_2(self):
         # Two flows in parallel
