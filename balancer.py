@@ -25,8 +25,13 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
     solver = pywraplp.Solver.CreateSolver('SCIP')
 
     # Decision variables
+    # wheter a cell is occupied by a component
     x = [[solver.BoolVar(f'x_{i}_{j}') for j in range(H)] for i in range(W)]
+    # belt in a direction
     b = [[[solver.BoolVar(f'b_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    # mixer in a direction. note that i, j are the left cell of the mixer
+    m = [[[solver.BoolVar(f'm_{i}_{j}_{d}') for d in DIRECTIONS if mixer_can_be_placed(i, j, d, grid_size)] for j in range(H)] for i in range(W)]
+    # flow of a source in a direction
     f = [[[[solver.NumVar(-1, 1, f'f_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
 
     # Constraints
@@ -88,7 +93,6 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
         for j in range(H):
             for s in range(num_sources):
                 if i == 0 and not any([input[0] == i and input[1] == j and input[3] == s and input[2] == 'E' for input in input_flows]):
-                    print('HERE', i, j, s)
                     solver.Add(f[i][j][s][DIRECTIONS.index('W')] == 0)
                 if i == W - 1 and not any([input[0] == i and input[1] == j and input[3] == s and input[2] == 'W' for input in input_flows]):
                     solver.Add(f[i][j][s][DIRECTIONS.index('E')] == 0)
@@ -120,7 +124,7 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
         print(f'Minimum area: {solver.Objective().Value()}')
     else:
         print('No optimal solution found.')
-    return viz_belts(b, grid_size)
+    return viz_components(b, m, grid_size)
 
 def viz_occupied(x, grid_size):
     H, W = grid_size
@@ -143,6 +147,27 @@ def viz_belts(b, grid_size):
         result += '\n'
     return result
 
+'''
+Visualizes all the components of the belt balancer
+'''
+def viz_components(b, m, grid_size):
+    H, W = grid_size
+    result = ''
+    # Iterate backward since Y axis is inverted
+    for j in range(H-1, -1, -1):
+        for i in range(W):
+            found = False
+            for d in range(len(DIRECTIONS)):
+                if found:
+                    break
+                if b[i][j][d].solution_value() > 0:
+                    result += f"{DIRECTIONS_SYMBOL[d]}"
+                    found = True
+            if not found:
+                result += 'O'
+        result += '\n'
+    return result
+
 def viz_flows(f, grid_size, num_flows):
     H, W = grid_size
     result = ''
@@ -156,6 +181,23 @@ def viz_flows(f, grid_size, num_flows):
             result += '| '
         result += '\n'
     return result
+
+'''
+Returns true if the mixer can be placed given the coordinates and direction.
+Note that the mixer i, j are the left cell of the mixer, so we need to keep into
+account where the right cell is going to be based on the direction.
+'''
+def mixer_can_be_placed(i, j, d, grid_size):
+    W, H = grid_size
+    if d == 'N':
+        return i < W - 1
+    if d == 'S':
+        return i > 0
+    if d == 'E':
+        return j < H - 1
+    if d == 'W':
+        return j > 0
+    return False
 
 solve_factorio_belt_balancer((3, 3), 1, [
     (0, 2, 'N', 0, -1),
