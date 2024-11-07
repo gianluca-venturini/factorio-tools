@@ -132,6 +132,14 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
                 if j == H - 1 and not any([input[0] == i and input[1] == j and input[3] == s and input[2] == 'N' for input in input_flows]):
                     solver.Add(f[i][j][s][DIRECTIONS.index('N')] == 0)
 
+    # 7. Sum of flows for all sources can never exceed 1 or be below -1
+    # TODO: revisit this constraint if different components support different max flows in the future
+    for i in range(W):
+        for j in range(H):
+            for d in range(len(DIRECTIONS)):
+                solver.Add(sum(f[i][j][s][d] for s in range(num_sources)) <= 1)
+                solver.Add(sum(f[i][j][s][d] for s in range(num_sources)) >= -1)
+
     ##
     ## Mixer constraints
     ##
@@ -273,7 +281,8 @@ def viz_flows(f, grid_size, num_flows):
         for i in range(W):
             for d in range(len(DIRECTIONS)):
                 for s in range(num_flows):
-                    result += f"{s} {DIRECTIONS[d]} {f[i][j][s][d].solution_value()} "
+                    if f[i][j][s][d].solution_value() != 0:
+                        result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){f[i][j][s][d].solution_value()} "
                 result += ' '
             result += '| '
         result += '\n'
@@ -384,11 +393,11 @@ def mixer_zero_directions(d):
 # ])
 
 # Single mixer balancer
-solve_factorio_belt_balancer((2, 1), 2, [
+solve_factorio_belt_balancer((2, 3), 2, [
     (0, 0, 'S', 0, 1),
     (1, 0, 'S', 1, 1),
-    (0, 0, 'N', 0, -0.5),
-    (0, 0, 'N', 1, -0.5),
-    (1, 0, 'N', 0, -0.5),
-    (1, 0, 'N', 1, -0.5),
+    (0, 2, 'N', 0, -0.5),
+    (0, 2, 'N', 1, -0.5),
+    (1, 2, 'N', 0, -0.5),
+    (1, 2, 'N', 1, -0.5),
 ])

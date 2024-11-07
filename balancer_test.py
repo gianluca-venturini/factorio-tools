@@ -118,7 +118,24 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # Single mixer that goes up
         self.assertEqual(result,
+            '^^\n'
             'Ww\n'
+        )
+
+    def test_solve_factorio_belt_balancer_mixer_belt_2_3(self):
+        # Two flows in parallel, requires two belts
+        result = solve_factorio_belt_balancer((2, 3), 2, [
+            (0, 0, 'S', 0, 1),
+            (1, 0, 'S', 1, 1),
+            (0, 2, 'N', 0, -0.5),
+            (0, 2, 'N', 1, -0.5),
+            (1, 2, 'N', 0, -0.5),
+            (1, 2, 'N', 1, -0.5),
+        ])
+        # Single mixer that goes up
+        self.assertEqual(result,
+            'Ww\n'
+            '^^\n'
             '^^\n'
         )
 
