@@ -1,8 +1,9 @@
 ## Install dependencies
-pyenv install 3.11.0
-pyenv global 3.11.0
+pyenv install 3.9.13
+pyenv global 3.9.13
 python -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
 
 ## Run tests
 python -m unittest discover -p '*_test.py'
