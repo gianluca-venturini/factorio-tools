@@ -191,7 +191,6 @@ Starts from coordinate 0, 0.
 '''
 def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m):
     W, H = grid_size
-    result = ''
     # Iterate backward since Y axis is inverted
     for j in range(H-1, -1, -1):
         for i in range(W):
@@ -202,7 +201,6 @@ def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b,
                     break
                 if b[i][j][d].solution_value() > 0:
                     render_b(i, j, DIRECTIONS[d])
-                    result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}"
                     found = True
             # Visualize the mixer first cell
             for d in range(len(DIRECTIONS)):
@@ -210,7 +208,6 @@ def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b,
                     break
                 if m[i][j][d].solution_value() > 0:
                     render_m(i, j, DIRECTIONS[d], 0)
-                    result += f"{MIXER_SYMBOL[DIRECTIONS[d]][0]}"
                     found = True
             # Visualize the mixer second cell
             for d in range(len(DIRECTIONS)):
@@ -219,12 +216,10 @@ def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b,
                 ci, cj = mixer_first_cell(i, j, DIRECTIONS[d])
                 if inside_grid(ci, cj, grid_size) and m[ci][cj][d].solution_value() > 0:
                     render_m(i, j, DIRECTIONS[d], 1)
-                    result += f"{MIXER_SYMBOL[DIRECTIONS[d]][1]}"
                     found = True
             if not found:
-                result += 'O'
-        result += '\n'
-    return result
+                render_empty()
+        render_new_line()
 
 def viz_flows(f, grid_size, num_flows):
     W, H = grid_size
