@@ -1,29 +1,5 @@
 from ortools.linear_solver import pywraplp
-
-DIRECTIONS = ('N', 'S', 'E', 'W')
-
-BELT_INPUT_DIRECTIONS = {
-    'N': ['S', 'E', 'W'],
-    'S': ['N', 'E', 'W'],
-    'E': ['N', 'S', 'W'],
-    'W': ['N', 'S', 'E'],
-}
-
-# Synbols used for visualizing the belt based on direction
-DIRECTIONS_SYMBOL = {
-    'N': '^',
-    'S': 'v',
-    'E': '>',
-    'W': '<',
-}
-# Symbols used for visualizing the mixer based on direction
-# since the mixer has two cells we have two different symbols (cell1, cell2)
-MIXER_SYMBOL = {
-    'N': ('W', 'w'),
-    'S': ('S', 's'),
-    'E': ('A', 'a'),
-    'W': ('D', 'd'),
-}
+from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, DIRECTIONS_SYMBOL, MIXER_SYMBOL, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx
 
 '''
 Finds the minimum area of a belt balancer for a given grid size and input flows
@@ -35,7 +11,6 @@ input_flows: list of tuples (i, j, d, flow) where i, j are the coordinates of th
 def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
     # Grid size
     W, H = grid_size
-
 
     # Create the solver
     solver = pywraplp.Solver.CreateSolver('SCIP')
@@ -210,181 +185,12 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
         print('flows:')
         print(viz_flows(f, grid_size, num_sources))
         print(f'Minimum area: {solver.Objective().Value()}')
+        print('Blueprint')
+        print(encode_components_blueprint_json(b, m, grid_size))
         return viz_components(b, m, grid_size)
     else:
         print('No optimal solution found.')
         return None
-
-def viz_occupied(x, grid_size):
-    W, H = grid_size
-    result = ''
-    # Iterate backward since Y axis is inverted
-    for j in range(H-1, -1, -1):
-        # Iterate backward since Y axis is inverted
-        for i in range(W):
-            result += 'X' if x[i][j].solution_value() > 0 else 'O'
-        result += '\n'
-    return result
-
-def viz_belts(b, grid_size):
-    W, H = grid_size
-    result = ''
-    # Iterate backward since Y axis is inverted
-    for j in range(H-1, -1, -1):
-        for i in range(W):
-            result += ''.join([f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}" if b[i][j][d].solution_value() > 0 else '' for d in range(len(DIRECTIONS))]) if sum(b[i][j][d].solution_value() for d in range(len(DIRECTIONS))) > 0 else 'O'
-        result += '\n'
-    return result
-
-'''
-Visualizes all the components of the belt balancer
-'''
-def viz_components(b, m, grid_size):
-    W, H = grid_size
-    result = ''
-    # Iterate backward since Y axis is inverted
-    for j in range(H-1, -1, -1):
-        for i in range(W):
-            found = False
-            # Visualize the belt
-            for d in range(len(DIRECTIONS)):
-                if found:
-                    break
-                if b[i][j][d].solution_value() > 0:
-                    result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}"
-                    found = True
-            # Visualize the mixer first cell
-            for d in range(len(DIRECTIONS)):
-                if found:
-                    break
-                if m[i][j][d].solution_value() > 0:
-                    result += f"{MIXER_SYMBOL[DIRECTIONS[d]][0]}"
-                    found = True
-            # Visualize the mixer second cell
-            for d in range(len(DIRECTIONS)):
-                if found:
-                    break
-                ci, cj = mixer_first_cell(i, j, DIRECTIONS[d])
-                if inside_grid(ci, cj, grid_size) and m[ci][cj][d].solution_value() > 0:
-                    result += f"{MIXER_SYMBOL[DIRECTIONS[d]][1]}"
-                    found = True
-            if not found:
-                result += 'O'
-        result += '\n'
-    return result
-
-def viz_flows(f, grid_size, num_flows):
-    W, H = grid_size
-    result = ''
-    # Iterate backward since Y axis is inverted
-    for j in range(H-1, -1, -1):
-        for i in range(W):
-            for d in range(len(DIRECTIONS)):
-                for s in range(num_flows):
-                    if f[i][j][s][d].solution_value() != 0:
-                        result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){f[i][j][s][d].solution_value()} "
-                result += ' '
-            result += '| '
-        result += '\n'
-    return result
-
-'''
-Returns true if the mixer can be placed given the coordinates and direction of the first cell.
-Note that the mixer i, j are the left cell of the mixer, so we need to keep into
-account where the right cell is going to be based on the direction.
-'''
-def mixer_can_be_placed(i, j, d, grid_size):
-    W, H = grid_size
-    ci, cj = mixer_second_cell(i, j, d)
-    result = inside_grid(i, j, grid_size) and inside_grid(ci, cj, grid_size)
-    return result
-
-def inside_grid(i, j, grid_size):
-    W, H = grid_size
-    return i >= 0 and i < W and j >= 0 and j < H
-
-'''
-Returns the coordinates of the second cell of the mixer given the coordinates of the first cell and the direction
-'''
-def mixer_second_cell(i, j, d):
-    if d == 'N':
-        return (i + 1, j)
-    if d == 'S':
-        return (i - 1, j)
-    if d == 'E':
-        return (i, j - 1)
-    if d == 'W':
-        return (i, j + 1)
-    raise Exception('Invalid direction')
-
-'''
-Returns the coordinates of the first cell of the mixer given the coordinates of the second cell and the direction
-'''
-def mixer_first_cell(i, j, d):
-    if d == 'N':
-        return (i - 1, j)
-    if d == 'S':
-        return (i + 1, j)
-    if d == 'E':
-        return (i, j + 1)
-    if d == 'W':
-        return (i, j - 1)
-    raise Exception('Invalid direction')
-
-'''
-Returns the input direction of the mixer
-'''
-def mixer_input_direction(d):
-    if d == 'N':
-        return 'S'
-    if d == 'S':
-        return 'N'
-    if d == 'E':
-        return 'W'
-    if d == 'W':
-        return 'E'
-    raise Exception('Invalid direction')
-
-'''
-Like mixer_input_direction but takes the index of the direction and output index
-'''
-def mixer_input_direction_idx(d):
-    return DIRECTIONS.index(mixer_input_direction(DIRECTIONS[d]))
-
-'''
-Returns the input direction of the mixer
-identity function since the mixer direction is defined as the output one
-'''
-def mixer_output_direction(d):
-    if d == 'N':
-        return 'N'
-    if d == 'S':
-        return 'S'
-    if d == 'E':
-        return 'E'
-    if d == 'W':
-        return 'W'
-    raise Exception('Invalid direction')
-
-'''
-Like mixer_output_direction but takes the index of the direction and output index
-'''
-def mixer_output_direction_idx(d):
-    return DIRECTIONS.index(mixer_output_direction(DIRECTIONS[d]))
-
-'''
-Return the directions that have a flow of zero
-'''
-def mixer_zero_directions(d):
-    if d == 'N':
-        return ['E', 'W']
-    if d == 'S':
-        return ['E', 'W']
-    if d == 'E':
-        return ['N', 'S']
-    if d == 'W':
-        return ['N', 'S']
-    raise Exception('Invalid direction')
 
 # # Single belt balancer
 # solve_factorio_belt_balancer((3, 3), 1, [
