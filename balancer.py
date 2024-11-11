@@ -1,5 +1,5 @@
 from ortools.linear_solver import pywraplp
-from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, DIRECTIONS_SYMBOL, MIXER_SYMBOL, MAX_UNDERGROUND_DISTANCE, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx, underground_exit_coordinates, underground_entrance_coordinates
+from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, DIRECTIONS_SYMBOL, MIXER_SYMBOL, MAX_UNDERGROUND_DISTANCE, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx, underground_exit_coordinates, underground_entrance_coordinates, underground_entrance_zero_directions, underground_exit_zero_directions, underground_entrance_flow_direction
 
 '''
 Finds the minimum area of a belt balancer for a given grid size and input flows
@@ -170,6 +170,51 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
                             solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] <= large_M * (1 - m[i][j][d]))
                             solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] >= -large_M * (1 - m[i][j][d]))
 
+    ##
+    ## Underground belt constraints
+    ##
+
+    # 10. Underground belt can't have a cell outside of the grid
+    for i in range(W):
+        for j in range(H):
+            for d in range(len(DIRECTIONS)):
+                for n in range(MAX_UNDERGROUND_DISTANCE):
+                    ci, cj = underground_exit_coordinates(i, j, DIRECTIONS[d], n)
+                    if not inside_grid(ci, cj, grid_size):
+                        solver.Add(u[i][j][d][n] == 0)
+
+    # 11. Flow through underground belt
+    for i in range(W):
+        for j in range(H):
+            for s in range(num_sources):
+                for d in range(len(DIRECTIONS)):
+                    for n in range(MAX_UNDERGROUND_DISTANCE):
+                        ci, cj = underground_exit_coordinates(i, j, DIRECTIONS[d], n)
+                        if inside_grid(ci, cj, grid_size):
+                            # Entrance and exit flows sum to zero
+                            solver.Add(
+                                f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] <= 
+                                large_M * (1 - u[i][j][d][n])
+                            )
+                            solver.Add(
+                                f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] >= 
+                                -large_M * (1 - u[i][j][d][n])
+                            )
+                            # Input flow is gte zero
+                            solver.Add(f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] >= -large_M * (1 - u[i][j][d][n]))
+                            # Output flow is lte zero
+                            solver.Add(f[ci][cj][s][d] <= large_M * (1 - u[i][j][d][n]))
+
+                            # Zero flow from all the other directions in entrance
+                            for dir in underground_entrance_zero_directions(DIRECTIONS[d]):
+                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
+                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
+
+                            # Zero flow from all the other directions in exit
+                            for dir in underground_exit_zero_directions(DIRECTIONS[d]):
+                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
+                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
+
     # Input constraints
     for input in input_flows:
         i, j, d, s, flow = input
@@ -185,15 +230,15 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
     if status == pywraplp.Solver.OPTIMAL:
         print('Solution')
         print('components:')
-        print(viz_components(b, m, grid_size))
+        print(viz_components(b, m, u, grid_size))
         print('occupied:')
         print(viz_occupied(x, grid_size))
         print('flows:')
         print(viz_flows(f, grid_size, num_sources))
         print(f'Minimum area: {solver.Objective().Value()}')
         print('Blueprint')
-        print(encode_components_blueprint_json(b, m, grid_size))
-        return viz_components(b, m, grid_size)
+        print(encode_components_blueprint_json(b, m, u, grid_size))
+        return viz_components(b, m, u, grid_size)
     else:
         print('No optimal solution found.')
         return None
@@ -215,7 +260,7 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
 # ])
 
 # Undergroun 2 belts
-solve_factorio_belt_balancer((6, 6), 2, [
+solve_factorio_belt_balancer((5, 6), 2, [
     (2, 0, 'S', 0, 1),
     (3, 0, 'S', 1, 1),
     (3, 5, 'N', 0, -1),

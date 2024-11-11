@@ -37,7 +37,7 @@ MIXER_SYMBOL = {
 # it's a tuple in the shape (entrance, exit)
 UNDERGROUND_BELT_SYMBOL = {
     'N': ('I', 'i'),
-    'S': ('K', 'K'),
+    'S': ('K', 'k'),
     'E': ('J', 'j'),
     'W': ('L', 'l'),
 }
@@ -57,6 +57,8 @@ MIXER_FIRST_CELL_BLUEPRINT_OFFSET = {
     'E': (0, -0.5),
     'W': (0, 0.5),
 }
+
+EPSILON = 1e-5
 
 '''
 Returns true if the mixer can be placed given the coordinates and direction of the first cell.
@@ -196,6 +198,50 @@ def underground_entrance_coordinates(i, j, d, n):
         return (i + offset, j)
     raise Exception('Invalid direction')
 
+'''
+Returns all the directions where the flow must be zero.
+For underground belt entrance, the flow is zero everywhere except the entrance direction that is the opposite of d.
+'''
+def underground_entrance_zero_directions(d):
+    if d == 'N':
+        return ('N', 'E', 'W')
+    if d == 'S':
+        return ('S', 'E', 'W')
+    if d == 'E':
+        return ('E', 'N', 'S')
+    if d == 'W':
+        return ('W', 'N', 'S')
+    raise Exception('Invalid direction')
+
+'''
+Returns all the directions where the flow must be zero.
+For underground belt exit, the flow is zero everywhere except the exit direction that is d.
+'''
+def underground_exit_zero_directions(d):
+    if d == 'N':
+        return ('S', 'E', 'W')
+    if d == 'S':
+        return ('N', 'E', 'W')
+    if d == 'E':
+        return ('W', 'N', 'S')
+    if d == 'W':
+        return ('E', 'N', 'S')
+    raise Exception('Invalid direction')
+
+'''
+The only non-zero flow direction in the entrance.
+'''
+def underground_entrance_flow_direction(d):
+    if d == 'N':
+        return 'S'
+    if d == 'S':
+        return 'N'
+    if d == 'E':
+        return 'W'
+    if d == 'W':
+        return 'E'
+    raise Exception('Invalid direction')
+
 def viz_occupied(x, grid_size):
     W, H = grid_size
     result = ''
@@ -220,7 +266,7 @@ def viz_belts(b, grid_size):
 '''
 Visualizes all the components of the belt balancer
 '''
-def viz_components(b, m, grid_size):
+def viz_components(b, m, u, grid_size):
     result = ''
     def render_b(i, j, d):
         nonlocal result
@@ -238,7 +284,7 @@ def viz_components(b, m, grid_size):
         nonlocal result
         result += '\n'
 
-    visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m, render_u)
+    visitor_components(b, m, u, grid_size, render_new_line, render_empty, render_b, render_m, render_u)
     return result
 
 '''
@@ -246,7 +292,7 @@ Visit all the cells and call the render_*() functions to render all the elements
 It's guaranteed to complete the entire row before proceeding to the next one.
 Starts from coordinate 0, 0.
 '''
-def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m, render_u):
+def visitor_components(b, m, u, grid_size, render_new_line, render_empty, render_b, render_m, render_u):
     W, H = grid_size
     # Iterate backward since Y axis is inverted
     for j in range(H-1, -1, -1):
@@ -303,14 +349,14 @@ def viz_flows(f, grid_size, num_flows):
         for i in range(W):
             for d in range(len(DIRECTIONS)):
                 for s in range(num_flows):
-                    if f[i][j][s][d].solution_value() != 0:
+                    if f[i][j][s][d].solution_value() < -EPSILON or f[i][j][s][d].solution_value() > EPSILON:
                         result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){f[i][j][s][d].solution_value()} "
                 result += ' '
             result += '| '
         result += '\n'
     return result
 
-def generate_entities_blueprint(b, m, grid_size):
+def generate_entities_blueprint(b, m, u, grid_size):
     unique_entity_number_generator = count(1)
 
     result = []
@@ -331,15 +377,18 @@ def generate_entities_blueprint(b, m, grid_size):
                 "position": { "x": i + offset[0], "y": j + offset[1] },
                 "direction": BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d]
             })
+    def render_u(i, j, d, c):
+        # TODO: implement
+        pass
     def render_empty():
         pass
     def render_new_line():
         pass
 
-    visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m)
+    visitor_components(b, m, u, grid_size, render_new_line, render_empty, render_b, render_m, render_u)
     return result
 
-def encode_components_blueprint_json(b, m, grid_size):
+def encode_components_blueprint_json(b, m, u, grid_size):
     # Use this tool to test this code online: https://factorioblueprints.tech/user/blueprint-create
 
     blueprint_json = {
@@ -352,7 +401,7 @@ def encode_components_blueprint_json(b, m, grid_size):
                     "index": 1
                 }
             ],
-            "entities": generate_entities_blueprint(b, m, grid_size),
+            "entities": generate_entities_blueprint(b, m, u, grid_size),
             "version": 281479276344320 # Factorio version 1.1.0
         }
     }
