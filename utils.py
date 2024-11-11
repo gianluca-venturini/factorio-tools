@@ -5,6 +5,11 @@ from itertools import count
 
 DIRECTIONS = ('N', 'S', 'E', 'W')
 
+# Maximum distance between entrance and exit of the underground belt
+# it's just the cells between the entrance and exit cell, without counting them
+# e.g. distance 0 means that entrance and exit are adjacent
+MAX_UNDERGROUND_DISTANCE = 3
+
 BELT_INPUT_DIRECTIONS = {
     'N': ['S', 'E', 'W'],
     'S': ['N', 'E', 'W'],
@@ -140,6 +145,46 @@ def mixer_zero_directions(d):
         return ['N', 'S']
     if d == 'W':
         return ['N', 'S']
+    raise Exception('Invalid direction')
+
+'''
+Returns the coordinates of the exit of the underground belt given the coordinates of the entrance and the direction
+'''
+def underground_exit_coordinates(i, j, d, n):
+    if n > MAX_UNDERGROUND_DISTANCE:
+        raise Exception('Underground belt distance is unexpected')
+    # Adding one to the offset is necessary since the exit is one cell after
+    # the distance of the underground belt
+    # e.g. distance 0 means that entrance and exit are adjacent, but not on the cell.
+    offset = n + 1
+    if d == 'N':
+        return (i, j + offset)
+    if d == 'S':
+        return (i, j - offset)
+    if d == 'E':
+        return (i + offset, j)
+    if d == 'W':
+        return (i - offset, j)
+    raise Exception('Invalid direction')
+
+'''
+Returns the coordinates of the entrance of the underground belt given the coordinates of the exit and the direction
+'''
+def underground_entrance_coordinates(i, j, d, n):
+    if n > MAX_UNDERGROUND_DISTANCE:
+        raise Exception('Underground belt distance is unexpected')
+    # Adding one to the offset is necessary since the entrance is one cell before
+    # the distance of the underground belt
+    # e.g. distance 0 means that entrance and exit are adjacent, but not on the cell.
+    offset = n + 1
+    if d == 'N':
+        return (i, j - offset)
+    if d == 'S':
+        return (i, j + offset)
+    if d == 'E':
+        return (i - offset, j)
+    if d == 'W':
+        return (i + offset, j)
     raise Exception('Invalid direction')
 
 def viz_occupied(x, grid_size):

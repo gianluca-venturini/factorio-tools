@@ -1,5 +1,5 @@
 from ortools.linear_solver import pywraplp
-from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, DIRECTIONS_SYMBOL, MIXER_SYMBOL, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx
+from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, DIRECTIONS_SYMBOL, MIXER_SYMBOL, MAX_UNDERGROUND_DISTANCE, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx, underground_exit_coordinates, underground_entrance_coordinates
 
 '''
 Finds the minimum area of a belt balancer for a given grid size and input flows
@@ -22,6 +22,8 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
     b = [[[solver.BoolVar(f'b_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # mixer in a direction. note that i, j are the left cell of the mixer
     m = [[[solver.BoolVar(f'm_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    # underground belt in a direction
+    u = [[[[solver.BoolVar(f'u_{i}_{j}_{d}_{n}') for n in range(MAX_UNDERGROUND_DISTANCE)] for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # flow of a source in a direction
     f = [[[[solver.NumVar(-1, 1, f'f_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
 
@@ -37,10 +39,14 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
             solver.Add(x[i][j] == 
                 # Belt in cell
                 sum(b[i][j][d] for d in range(len(DIRECTIONS))) +
-                # First cell of mixer in cell i, j
+                # Mixer first cell i, j
                 sum(m[i][j][d] for d in range(len(DIRECTIONS)) if mixer_can_be_placed(i, j, DIRECTIONS[d], grid_size)) +
-                # Second cell of mixer in ci, cj in cell i, j
-                sum(m[ci][cj][d] for d in range(len(DIRECTIONS)) for ci, cj in [mixer_first_cell(i, j, DIRECTIONS[d])] if inside_grid(ci, cj, grid_size))
+                # Mixer first cell in ci, cj. Second cell in i, j
+                sum(m[ci][cj][d] for d in range(len(DIRECTIONS)) for ci, cj in [mixer_first_cell(i, j, DIRECTIONS[d])] if inside_grid(ci, cj, grid_size)) +
+                # Underground belt entrance in cell i, j
+                sum(u[i][j][d][n] for n in range(MAX_UNDERGROUND_DISTANCE) for d in range(len(DIRECTIONS))) +
+                # Underground belt exit in cell i, j. Entrance in ci, cj
+                sum(u[ci][cj][d][n] for n in range(MAX_UNDERGROUND_DISTANCE) for d in range(len(DIRECTIONS)) for ci, cj in [underground_entrance_coordinates(i, j, DIRECTIONS[d], n)] if inside_grid(ci, cj, grid_size))
             )
 
     # 2. Empty Flow Constraints
@@ -198,12 +204,20 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
 #     (0, 0, 'S', 0, 1),
 # ])
 
-# Single mixer balancer
-solve_factorio_belt_balancer((2, 3), 2, [
-    (0, 0, 'S', 0, 1),
-    (1, 0, 'S', 1, 1),
-    (0, 2, 'N', 0, -0.5),
-    (0, 2, 'N', 1, -0.5),
-    (1, 2, 'N', 0, -0.5),
-    (1, 2, 'N', 1, -0.5),
+# # Single mixer balancer
+# solve_factorio_belt_balancer((2, 3), 2, [
+#     (0, 0, 'S', 0, 1),
+#     (1, 0, 'S', 1, 1),
+#     (0, 2, 'N', 0, -0.5),
+#     (0, 2, 'N', 1, -0.5),
+#     (1, 2, 'N', 0, -0.5),
+#     (1, 2, 'N', 1, -0.5),
+# ])
+
+# Undergroun 2 belts
+solve_factorio_belt_balancer((6, 6), 2, [
+    (2, 0, 'S', 0, 1),
+    (3, 0, 'S', 1, 1),
+    (3, 5, 'N', 0, -1),
+    (2, 5, 'N', 1, -1),
 ])
