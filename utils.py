@@ -44,10 +44,18 @@ UNDERGROUND_BELT_SYMBOL = {
 
 # Blueprint representation of belt direction
 BELT_DIRECTION_TO_BLUEPRINT_DIRECTION = {
-    'N': 0,
-    'S': 4,
-    'E': 8,
-    'W': 6,
+    'N': 6,
+    'S': 2,
+    'E': 0,
+    'W': 4,
+}
+
+UNDERGROUND_BELT_DIRECTION_TO_BLUEPRINT_DIRECTION = {
+    # Note: these mappings may be incorrect, need to double check them
+    'N': 6,
+    'S': 2,
+    'E': 0,
+    'W': 4,
 }
 
 # Blueprint mixers coordinates are centered, so we need to apply an offset based on the direction
@@ -378,7 +386,13 @@ def generate_entities_blueprint(b, m, u, grid_size):
                 "direction": BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d]
             })
     def render_u(i, j, d, c):
-        # TODO: implement
+        result.append({
+            "entity_number": next(unique_entity_number_generator),
+            "name": "underground-belt",
+            "position": { "x": i, "y": j },
+            "type": "input" if c == 0 else "output",
+            "direction": UNDERGROUND_BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d],
+        })
         pass
     def render_empty():
         pass
@@ -408,6 +422,7 @@ def encode_components_blueprint_json(b, m, u, grid_size):
 
     # Serialize the JSON object to a compact string
     json_str = json.dumps(blueprint_json, separators=(',', ':'))
+    print(json_str)
 
     # Compress the JSON string using zlib's DEFLATE algorithm
     compressed_data = zlib.compress(json_str.encode('utf-8'))

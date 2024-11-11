@@ -11,3 +11,7 @@ python -m unittest discover -p '*_test.py'
 ## Convert blueprints
 echo "my_base64_string_without_first_byte" | base64 -D | zlib-flate -uncompress
 
+### TODO
+- Check that blueprints are rendered correctly
+- Make sure underground belts don't overlap
+- Write tests for underground belts
