@@ -33,6 +33,15 @@ MIXER_SYMBOL = {
     'W': ('D', 'd'),
 }
 
+# Symbols used for visualizing the underground belt based on direction
+# it's a tuple in the shape (entrance, exit)
+UNDERGROUND_BELT_SYMBOL = {
+    'N': ('I', 'i'),
+    'S': ('K', 'K'),
+    'E': ('J', 'j'),
+    'W': ('L', 'l'),
+}
+
 # Blueprint representation of belt direction
 BELT_DIRECTION_TO_BLUEPRINT_DIRECTION = {
     'N': 0,
@@ -219,6 +228,9 @@ def viz_components(b, m, grid_size):
     def render_m(i, j, d, c):
         nonlocal result
         result += f"{MIXER_SYMBOL[d][c]}"
+    def render_u(i, j, d, c):
+        nonlocal result
+        result += f"{UNDERGROUND_BELT_SYMBOL[d][c]}"
     def render_empty():
         nonlocal result
         result += 'O'
@@ -226,7 +238,7 @@ def viz_components(b, m, grid_size):
         nonlocal result
         result += '\n'
 
-    visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m)
+    visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m, render_u)
     return result
 
 '''
@@ -234,7 +246,7 @@ Visit all the cells and call the render_*() functions to render all the elements
 It's guaranteed to complete the entire row before proceeding to the next one.
 Starts from coordinate 0, 0.
 '''
-def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m):
+def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b, render_m, render_u):
     W, H = grid_size
     # Iterate backward since Y axis is inverted
     for j in range(H-1, -1, -1):
@@ -262,6 +274,23 @@ def visitor_components(b, m, grid_size, render_new_line, render_empty, render_b,
                 if inside_grid(ci, cj, grid_size) and m[ci][cj][d].solution_value() > 0:
                     render_m(i, j, DIRECTIONS[d], 1)
                     found = True
+            # Visualize the underground belt entrance
+            for d in range(len(DIRECTIONS)):
+                if found:
+                    break
+                for n in range(MAX_UNDERGROUND_DISTANCE):
+                    if u[i][j][d][n].solution_value() > 0:
+                        render_u(i, j, DIRECTIONS[d], 0)
+                        found = True
+            # Visualize the underground belt exit
+            for d in range(len(DIRECTIONS)):
+                if found:
+                    break
+                for n in range(MAX_UNDERGROUND_DISTANCE):
+                    ci, cj = underground_entrance_coordinates(i, j, DIRECTIONS[d], n)
+                    if inside_grid(ci, cj, grid_size) and u[ci][cj][d][n].solution_value() > 0:
+                        render_u(i, j, DIRECTIONS[d], 1)
+                        found = True
             if not found:
                 render_empty()
         render_new_line()
