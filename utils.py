@@ -19,27 +19,27 @@ BELT_INPUT_DIRECTIONS = {
 
 # Synbols used for visualizing the belt based on direction
 DIRECTIONS_SYMBOL = {
-    'N': '^',
-    'S': 'v',
-    'E': '>',
-    'W': '<',
+    'N': '▲',
+    'S': '▼',
+    'E': '▶',
+    'W': '◀',
 }
 # Symbols used for visualizing the mixer based on direction
 # since the mixer has two cells we have two different symbols (cell1, cell2)
 MIXER_SYMBOL = {
-    'N': ('W', 'w'),
-    'S': ('S', 's'),
-    'E': ('A', 'a'),
-    'W': ('D', 'd'),
+    'N': ('↿', '↾'),
+    'S': ('⇂', '⇃'),
+    'E': ('⇀', '⇁'),
+    'W': ('↽', '↼'),
 }
 
 # Symbols used for visualizing the underground belt based on direction
 # it's a tuple in the shape (entrance, exit)
 UNDERGROUND_BELT_SYMBOL = {
-    'N': ('I', 'i'),
-    'S': ('K', 'k'),
-    'E': ('J', 'j'),
-    'W': ('L', 'l'),
+    'N': ('△', '↥'),
+    'S': ('▽', '↧'),
+    'E': ('▷', '↦'),
+    'W': ('◁', '↤'),
 }
 
 # Blueprint representation of belt direction
@@ -257,7 +257,7 @@ def viz_occupied(x, grid_size):
     for j in range(H-1, -1, -1):
         # Iterate backward since Y axis is inverted
         for i in range(W):
-            result += 'X' if x[i][j].solution_value() > 0 else 'O'
+            result += '■' if x[i][j].solution_value() > 0 else '‧'
         result += '\n'
     return result
 
@@ -287,7 +287,7 @@ def viz_components(b, m, u, grid_size):
         result += f"{UNDERGROUND_BELT_SYMBOL[d][c]}"
     def render_empty():
         nonlocal result
-        result += 'O'
+        result += '‧'
     def render_new_line():
         nonlocal result
         result += '\n'
