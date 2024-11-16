@@ -8,7 +8,7 @@ grid_size: tuple (W, H) where W is the width and H is the height of the grid
 num_sources: int number of flow sources
 input_flows: list of tuples (i, j, d, flow) where i, j are the coordinates of the flow source, d is the direction of the flow, s the source number, and flow is the flow value
 '''
-def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
+def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_underground=False):
     # Grid size
     W, H = grid_size
 
@@ -22,8 +22,12 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
     b = [[[solver.BoolVar(f'b_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # mixer in a direction. note that i, j are the left cell of the mixer
     m = [[[solver.BoolVar(f'm_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
-    # underground belt in a direction
-    u = [[[[solver.BoolVar(f'u_{i}_{j}_{d}_{n}') for n in range(MAX_UNDERGROUND_DISTANCE)] for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    if not disable_underground:
+        # underground belt in a direction
+        u = [[[[solver.BoolVar(f'u_{i}_{j}_{d}_{n}') for n in range(MAX_UNDERGROUND_DISTANCE)] for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    else:
+        # mock underground variable when disabled to avoid passing down the flag
+        u = [[[[SimpleMockVariable(0) for n in range(MAX_UNDERGROUND_DISTANCE)] for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # flow of a source in a direction
     f = [[[[solver.NumVar(-1, 1, f'f_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
 
@@ -43,10 +47,14 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
                 sum(m[i][j][d] for d in range(len(DIRECTIONS)) if mixer_can_be_placed(i, j, DIRECTIONS[d], grid_size)) +
                 # Mixer first cell in ci, cj. Second cell in i, j
                 sum(m[ci][cj][d] for d in range(len(DIRECTIONS)) for ci, cj in [mixer_first_cell(i, j, DIRECTIONS[d])] if inside_grid(ci, cj, grid_size)) +
-                # Underground belt entrance in cell i, j
-                sum(u[i][j][d][n] for n in range(MAX_UNDERGROUND_DISTANCE) for d in range(len(DIRECTIONS))) +
-                # Underground belt exit in cell i, j. Entrance in ci, cj
-                sum(u[ci][cj][d][n] for n in range(MAX_UNDERGROUND_DISTANCE) for d in range(len(DIRECTIONS)) for ci, cj in [underground_entrance_coordinates(i, j, DIRECTIONS[d], n)] if inside_grid(ci, cj, grid_size))
+                (
+                    # Underground belt entrance in cell i, j
+                    sum(u[i][j][d][n] for n in range(MAX_UNDERGROUND_DISTANCE) for d in range(len(DIRECTIONS))) +
+                    # Underground belt exit in cell i, j. Entrance in ci, cj
+                    sum(u[ci][cj][d][n] for n in range(MAX_UNDERGROUND_DISTANCE) for d in range(len(DIRECTIONS)) for ci, cj in [underground_entrance_coordinates(i, j, DIRECTIONS[d], n)] if inside_grid(ci, cj, grid_size))
+                    if not disable_underground 
+                    else 0
+                )
             )
 
     # 2. Empty Flow Constraints
@@ -174,46 +182,47 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
     ## Underground belt constraints
     ##
 
-    # 10. Underground belt can't have a cell outside of the grid
-    for i in range(W):
-        for j in range(H):
-            for d in range(len(DIRECTIONS)):
-                for n in range(MAX_UNDERGROUND_DISTANCE):
-                    ci, cj = underground_exit_coordinates(i, j, DIRECTIONS[d], n)
-                    if not inside_grid(ci, cj, grid_size):
-                        solver.Add(u[i][j][d][n] == 0)
-
-    # 11. Flow through underground belt
-    for i in range(W):
-        for j in range(H):
-            for s in range(num_sources):
+    if not disable_underground:
+        # 10. Underground belt can't have a cell outside of the grid
+        for i in range(W):
+            for j in range(H):
                 for d in range(len(DIRECTIONS)):
                     for n in range(MAX_UNDERGROUND_DISTANCE):
                         ci, cj = underground_exit_coordinates(i, j, DIRECTIONS[d], n)
-                        if inside_grid(ci, cj, grid_size):
-                            # Entrance and exit flows sum to zero
-                            solver.Add(
-                                f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] <= 
-                                large_M * (1 - u[i][j][d][n])
-                            )
-                            solver.Add(
-                                f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] >= 
-                                -large_M * (1 - u[i][j][d][n])
-                            )
-                            # Input flow is gte zero
-                            solver.Add(f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] >= -large_M * (1 - u[i][j][d][n]))
-                            # Output flow is lte zero
-                            solver.Add(f[ci][cj][s][d] <= large_M * (1 - u[i][j][d][n]))
+                        if not inside_grid(ci, cj, grid_size):
+                            solver.Add(u[i][j][d][n] == 0)
 
-                            # Zero flow from all the other directions in entrance
-                            for dir in underground_entrance_zero_directions(DIRECTIONS[d]):
-                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
-                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
+        # 11. Flow through underground belt
+        for i in range(W):
+            for j in range(H):
+                for s in range(num_sources):
+                    for d in range(len(DIRECTIONS)):
+                        for n in range(MAX_UNDERGROUND_DISTANCE):
+                            ci, cj = underground_exit_coordinates(i, j, DIRECTIONS[d], n)
+                            if inside_grid(ci, cj, grid_size):
+                                # Entrance and exit flows sum to zero
+                                solver.Add(
+                                    f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] <= 
+                                    large_M * (1 - u[i][j][d][n])
+                                )
+                                solver.Add(
+                                    f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] >= 
+                                    -large_M * (1 - u[i][j][d][n])
+                                )
+                                # Input flow is gte zero
+                                solver.Add(f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] >= -large_M * (1 - u[i][j][d][n]))
+                                # Output flow is lte zero
+                                solver.Add(f[ci][cj][s][d] <= large_M * (1 - u[i][j][d][n]))
 
-                            # Zero flow from all the other directions in exit
-                            for dir in underground_exit_zero_directions(DIRECTIONS[d]):
-                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
-                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
+                                # Zero flow from all the other directions in entrance
+                                for dir in underground_entrance_zero_directions(DIRECTIONS[d]):
+                                    solver.Add(f[i][j][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
+                                    solver.Add(f[i][j][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
+
+                                # Zero flow from all the other directions in exit
+                                for dir in underground_exit_zero_directions(DIRECTIONS[d]):
+                                    solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
+                                    solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
 
     # Input constraints
     for input in input_flows:
@@ -242,6 +251,12 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows):
     else:
         print('No optimal solution found.')
         return None
+    
+class SimpleMockVariable:
+    def __init__(self, value):
+        self.value_ = value
+    def solution_value(self):
+        return self.value_
 
 # # Single belt balancer
 # solve_factorio_belt_balancer((3, 3), 1, [
