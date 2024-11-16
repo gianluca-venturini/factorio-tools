@@ -8,7 +8,7 @@ grid_size: tuple (W, H) where W is the width and H is the height of the grid
 num_sources: int number of flow sources
 input_flows: list of tuples (i, j, d, flow) where i, j are the coordinates of the flow source, d is the direction of the flow, s the source number, and flow is the flow value
 '''
-def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_belt=False, disable_underground=False):
+def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_belt=False, disable_underground=False, max_parallel=False, feasible_ok=False):
     # Grid size
     W, H = grid_size
 
@@ -253,14 +253,21 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
     solver.Minimize(objective1)
 
     # Configure the solver to use all available threads
-    solver.SetSolverSpecificParametersAsString("parallel/maxnthreads=0")  # Use all threads
+    if max_parallel:
+        solver.SetSolverSpecificParametersAsString("parallel/maxnthreads=0")  # Use all threads
+
+    if feasible_ok:
+        solver.SetSolverSpecificParametersAsString("""
+            limits/time = 10
+            limits/solutions = 1
+        """)
 
     # Solve the problem
     status = solver.Solve()
 
     # Output the results
-    if status == pywraplp.Solver.OPTIMAL:
-        print('Solution')
+    if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
+        print('Solution is', 'optimal' if status == pywraplp.Solver.OPTIMAL else 'feasible')
         print('components:')
         print(viz_components(b, m, u, grid_size))
         print('occupied:')
