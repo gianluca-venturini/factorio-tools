@@ -8,7 +8,7 @@ grid_size: tuple (W, H) where W is the width and H is the height of the grid
 num_sources: int number of flow sources
 input_flows: list of tuples (i, j, d, flow) where i, j are the coordinates of the flow source, d is the direction of the flow, s the source number, and flow is the flow value
 '''
-def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_underground=False):
+def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_belt=False, disable_underground=False):
     # Grid size
     W, H = grid_size
 
@@ -61,6 +61,12 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_un
     ##
     ## Belt constraints
     ##
+
+    if disable_belt:
+        for i in range(W):
+            for j in range(H):
+                for d in range(len(DIRECTIONS)):
+                    solver.Add(b[i][j][d] == 0)
 
     # 3. Flow Conservation for Belts
     for i in range(W):

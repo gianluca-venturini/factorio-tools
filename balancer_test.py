@@ -139,5 +139,47 @@ class TestFactorioBalancer(unittest.TestCase):
             '↿↾\n'
         )
 
+    ###
+    ### Underground belts
+    ###
+
+    def test_solve_factorio_belt_balancer_underground_1_2(self):
+        result = solve_factorio_belt_balancer((1, 2), 1, [
+            (0, 0, 'S', 0, 1),
+            (0, 1, 'N', 0, -1),
+        ], disable_belt=True)
+        # Single underground belt that goes up no spaces
+        self.assertEqual(result,
+            '↥\n'
+            '△\n'
+        )
+
+    def test_solve_factorio_belt_balancer_underground_1_3(self):
+        result = solve_factorio_belt_balancer((1, 3), 1, [
+            (0, 0, 'S', 0, 1),
+            (0, 2, 'N', 0, -1),
+        ], disable_belt=True)
+        # Single underground belt that goes up
+        self.assertEqual(result,
+            '↥\n'
+            '‧\n'
+            '△\n'
+        )
+
+    def test_solve_factorio_belt_balancer_underground_2_3(self):
+        # Two flows in parallel, requires two underground belts
+        result = solve_factorio_belt_balancer((2, 3), 2, [
+            (0, 0, 'S', 0, 1),
+            (1, 0, 'S', 0, 1),
+            (0, 2, 'N', 0, -1),
+            (1, 2, 'N', 0, -1),
+        ], disable_belt=True)
+        # Single underground belt that goes up
+        self.assertEqual(result,
+            '↥↥\n'
+            '‧‧\n'
+            '△△\n'
+        )
+
 if __name__ == '__main__':
     unittest.main()
