@@ -6,7 +6,7 @@ class TestFactorioBalancer(unittest.TestCase):
     def test_solve_factorio_belt_balancer_single_cell_no_flow(self):
         result = solve_factorio_belt_balancer((1, 1), 1, [])
         # No components
-        self.assertEqual(result, 'O\n')
+        self.assertEqual(result, '‧\n')
 
     ###
     ### Belts
@@ -18,7 +18,7 @@ class TestFactorioBalancer(unittest.TestCase):
             (0, 0, 'S', 0, 1),
         ])
         # One belt that goes up
-        self.assertEqual(result, '^\n')
+        self.assertEqual(result, '▲\n')
 
     def test_solve_factorio_belt_balancer_single_cell_flow_down(self):
         result = solve_factorio_belt_balancer((1, 1), 1, [
@@ -26,7 +26,7 @@ class TestFactorioBalancer(unittest.TestCase):
             (0, 0, 'S', 0, -1),
         ])
         # One belt that goes down
-        self.assertEqual(result, 'v\n')
+        self.assertEqual(result, '▼\n')
 
     def test_solve_factorio_belt_balancer_2_2_flow_up(self):
         result = solve_factorio_belt_balancer((2, 2), 1, [
@@ -35,8 +35,8 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # One belt that goes down
         self.assertEqual(result,
-            '^O\n' +
-            '^O\n'
+            '▲‧\n' +
+            '▲‧\n'
         )
 
     def test_solve_factorio_belt_balancer_2_2_1_flow_down(self):
@@ -46,8 +46,8 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # One belt that goes down
         self.assertEqual(result,
-            'vO\n' +
-            'vO\n'
+            '▼‧\n' +
+            '▼‧\n'
         )
     def test_solve_factorio_belt_balancer_3_3_1_flow_down(self):
         result = solve_factorio_belt_balancer((3, 3), 1, [
@@ -56,9 +56,9 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # One belt that goes down
         self.assertEqual(result,
-            'vOO\n' +
-            'vOO\n' +
-            'vOO\n'
+            '▼‧‧\n' +
+            '▼‧‧\n' +
+            '▼‧‧\n'
         )
 
     def test_solve_factorio_belt_balancer_3_3_1_flow_up(self):
@@ -68,9 +68,9 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # One belt that goes down
         self.assertEqual(result,
-            '^OO\n' +
-            '^OO\n' +
-            '^OO\n'
+            '▲‧‧\n' +
+            '▲‧‧\n' +
+            '▲‧‧\n'
         )
 
     def test_solve_factorio_belt_balancer_2_2_2(self):
@@ -83,8 +83,8 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # Two parallel belts that go down
         self.assertEqual(result,
-            'vv\n' +
-            'vv\n'
+            '▼▼\n' +
+            '▼▼\n'
         )
 
     ###
@@ -103,7 +103,7 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # Single mixer that gos up
         self.assertEqual(result,
-            'Ww\n'
+            '↿↾\n'
         )
 
     def test_solve_factorio_belt_balancer_mixer_belt_2_2(self):
@@ -118,8 +118,8 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # Single mixer that goes up
         self.assertEqual(result,
-            '^^\n'
-            'Ww\n'
+            '▲▲\n'
+            '↿↾\n'
         )
 
     def test_solve_factorio_belt_balancer_mixer_belt_2_3(self):
@@ -134,9 +134,9 @@ class TestFactorioBalancer(unittest.TestCase):
         ])
         # Single mixer that goes up
         self.assertEqual(result,
-            'Ww\n'
-            '^^\n'
-            '^^\n'
+            '▲▲\n'
+            '▲▲\n'
+            '↿↾\n'
         )
 
 if __name__ == '__main__':
