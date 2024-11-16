@@ -228,6 +228,22 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
                                 solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
                                 solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
 
+    # 12. No entrance between entrance and exit
+    for i in range(W):
+        for j in range(H):
+            for d in range(len(DIRECTIONS)):
+                for n in range(MAX_UNDERGROUND_DISTANCE):
+                    for d2 in range(len(DIRECTIONS)):
+                        for n2 in range(n):
+                            ci, cj = underground_exit_coordinates(i, j, DIRECTIONS[d], n2)
+                            if not inside_grid(ci, cj, grid_size):
+                                continue
+                            for n3 in range(MAX_UNDERGROUND_DISTANCE):
+                                solver.Add(u[ci][cj][d2][n3] <= large_M * (1 - u[i][j][d][n]))
+                                solver.Add(u[ci][cj][d2][n3] >= -large_M * (1 - u[i][j][d][n]))
+                                
+                            
+
     # Input constraints
     for input in input_flows:
         i, j, d, s, flow = input
@@ -235,6 +251,9 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
 
     objective1 = solver.Sum(x[i][j] for i in range(W) for j in range(H))
     solver.Minimize(objective1)
+
+    # Configure the solver to use all available threads
+    solver.SetSolverSpecificParametersAsString("parallel/maxnthreads=0")  # Use all threads
 
     # Solve the problem
     status = solver.Solve()
@@ -256,26 +275,29 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
         print('No optimal solution found.')
         return None
 
-# # Single belt balancer
-# solve_factorio_belt_balancer((3, 3), 1, [
-#     (0, 2, 'N', 0, -1),
-#     (0, 0, 'S', 0, 1),
-# ])
+# if main
+if __name__ == '__main__':
 
-# # Single mixer balancer
-# solve_factorio_belt_balancer((2, 3), 2, [
-#     (0, 0, 'S', 0, 1),
-#     (1, 0, 'S', 1, 1),
-#     (0, 2, 'N', 0, -0.5),
-#     (0, 2, 'N', 1, -0.5),
-#     (1, 2, 'N', 0, -0.5),
-#     (1, 2, 'N', 1, -0.5),
-# ])
+    # Single belt balancer
+    # solve_factorio_belt_balancer((3, 3), 1, [
+    #     (0, 2, 'N', 0, -1),
+    #     (0, 0, 'S', 0, 1),
+    # ])
 
-# Undergroun 2 belts
-solve_factorio_belt_balancer((5, 6), 2, [
-    (2, 0, 'S', 0, 1),
-    (3, 0, 'S', 1, 1),
-    (3, 5, 'N', 0, -1),
-    (2, 5, 'N', 1, -1),
-])
+    # # Single mixer balancer
+    # solve_factorio_belt_balancer((2, 3), 2, [
+    #     (0, 0, 'S', 0, 1),
+    #     (1, 0, 'S', 1, 1),
+    #     (0, 2, 'N', 0, -0.5),
+    #     (0, 2, 'N', 1, -0.5),
+    #     (1, 2, 'N', 0, -0.5),
+    #     (1, 2, 'N', 1, -0.5),
+    # ])
+
+    # Undergroun 2 belts
+    solve_factorio_belt_balancer((5, 6), 2, [
+        (2, 0, 'S', 0, 1),
+        (3, 0, 'S', 1, 1),
+        (3, 5, 'N', 0, -1),
+        (2, 5, 'N', 1, -1),
+    ])
