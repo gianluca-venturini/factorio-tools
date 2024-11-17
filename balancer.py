@@ -1,4 +1,4 @@
-from ortools.linear_solver import pywraplp
+from ortools.sat.python import cp_model
 from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, DIRECTIONS_SYMBOL, MIXER_SYMBOL, MAX_UNDERGROUND_DISTANCE, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx, underground_exit_coordinates, underground_entrance_coordinates, underground_entrance_zero_directions, underground_exit_zero_directions, underground_entrance_flow_direction
 
 '''
@@ -8,29 +8,26 @@ grid_size: tuple (W, H) where W is the width and H is the height of the grid
 num_sources: int number of flow sources
 input_flows: list of tuples (i, j, d, flow) where i, j are the coordinates of the flow source, d is the direction of the flow, s the source number, and flow is the flow value
 '''
-def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_belt=False, disable_underground=False, max_parallel=False, feasible_ok=False):
+def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, disable_belt=False, disable_underground=False, max_parallel=False, feasible_ok=False):
     # Grid size
     W, H = grid_size
 
-    # Create the solver
-    solver = pywraplp.Solver.CreateSolver('SCIP')
+    # Create the CP-SAT solver
+    solver = cp_model.CpModel()
 
     # Decision variables
     # wheter a cell is occupied by a component
-    x = [[solver.BoolVar(f'x_{i}_{j}') for j in range(H)] for i in range(W)]
+    x = [[solver.NewBoolVar(f'x_{i}_{j}') for j in range(H)] for i in range(W)]
     # belt in a direction
-    b = [[[solver.BoolVar(f'b_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    b = [[[solver.NewBoolVar(f'b_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # mixer in a direction. note that i, j are the left cell of the mixer
-    m = [[[solver.BoolVar(f'm_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    m = [[[solver.NewBoolVar(f'm_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # underground belt in a direction
-    u = [[[[solver.BoolVar(f'u_{i}_{j}_{d}_{n}') for n in range(MAX_UNDERGROUND_DISTANCE)] for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    u = [[[[solver.NewBoolVar(f'u_{i}_{j}_{d}_{n}') for n in range(MAX_UNDERGROUND_DISTANCE)] for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # flow of a source in a direction
-    f = [[[[solver.NumVar(-1, 1, f'f_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
+    f = [[[[solver.NewIntVar(-max_flow, max_flow, f'f_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
 
     # Constraints
-
-    # Large constant M for big-M constraints
-    large_M = 1000
     
     # 1. Occupied Cells Constraint
     for i in range(W):
@@ -55,8 +52,7 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
             for s in range(num_sources):
                 for d in range(len(DIRECTIONS)):
                     # No flow on empty cell
-                    solver.Add(f[i][j][s][d] <= large_M *  x[i][j])
-                    solver.Add(f[i][j][s][d] >= -large_M * x[i][j])
+                    solver.Add(f[i][j][s][d] == 0).only_enforce_if(x[i][j].Not())
 
     ##
     ## Belt constraints
@@ -74,8 +70,7 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
             for s in range(num_sources):
                 for d in range(len(DIRECTIONS)):
                     # Flow into the belt must equal the flow out of the belt
-                    solver.Add(sum(f[i][j][s][di] for di in range(len(DIRECTIONS))) <= large_M * (1 - b[i][j][d]))
-                    solver.Add(sum(f[i][j][s][di] for di in range(len(DIRECTIONS))) >= -large_M * (1 - b[i][j][d]))
+                    solver.Add(sum(f[i][j][s][di] for di in range(len(DIRECTIONS))) == 0).only_enforce_if(b[i][j][d])
 
     # 4. Flow through belt
     for i in range(W):
@@ -83,10 +78,10 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
             for s in range(num_sources):
                 for d in range(len(DIRECTIONS)):
                     # Output flow always lower or equal zero
-                    solver.Add(f[i][j][s][d] <= large_M * (1 - b[i][j][d]))
+                    solver.Add(f[i][j][s][d] <= 0).only_enforce_if(b[i][j][d])
                     for di in [DIRECTIONS.index(dir) for dir in BELT_INPUT_DIRECTIONS[DIRECTIONS[d]]]:
                         # Input flow always greater or equal zero
-                        solver.Add(f[i][j][s][di] >= -large_M * (1 - b[i][j][d]))
+                        solver.Add(f[i][j][s][di] >= 0).only_enforce_if(b[i][j][d])
 
     ##
     ## Flow constraints
@@ -124,8 +119,8 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
     for i in range(W):
         for j in range(H):
             for d in range(len(DIRECTIONS)):
-                solver.Add(sum(f[i][j][s][d] for s in range(num_sources)) <= 1)
-                solver.Add(sum(f[i][j][s][d] for s in range(num_sources)) >= -1)
+                solver.Add(sum(f[i][j][s][d] for s in range(num_sources)) <= max_flow)
+                solver.Add(sum(f[i][j][s][d] for s in range(num_sources)) >= -max_flow)
 
     ##
     ## Mixer constraints
@@ -149,32 +144,24 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
                         # Input and output flows sum to zero
                         solver.Add(
                             f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] + 
-                            f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] <= 
-                            large_M * (1 - m[i][j][d])
-                        )
-                        solver.Add(
-                            f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] + 
-                            f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] >= 
-                            -large_M * (1 - m[i][j][d])
-                        )
+                            f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] == 
+                            0
+                        ).only_enforce_if(m[i][j][d])
                         # Output flow is evenly distributed in the two cell outputs: the two outputs are identical
-                        solver.Add(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] <= large_M * (1 - m[i][j][d]))
-                        solver.Add(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] >= -large_M * (1 - m[i][j][d]))
+                        solver.Add(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d])
                         # Input flows are gte zero
-                        solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= -large_M * (1 - m[i][j][d]))
-                        solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= -large_M * (1 - m[i][j][d]))
+                        solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d])
+                        solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d])
                         # Output flows are lte zero
-                        solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= large_M * (1 - m[i][j][d]))
-                        solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= large_M * (1 - m[i][j][d]))
+                        solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d])
+                        solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d])
                         # Zero flow from all the other directions that are not input or output
                         directions = mixer_zero_directions(DIRECTIONS[d])
                         for dir in directions:
                             # cell 1
-                            solver.Add(f[i][j][s][DIRECTIONS.index(dir)] <= large_M * (1 - m[i][j][d]))
-                            solver.Add(f[i][j][s][DIRECTIONS.index(dir)] >= -large_M * (1 - m[i][j][d]))
+                            solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d])
                             # cell 2
-                            solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] <= large_M * (1 - m[i][j][d]))
-                            solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] >= -large_M * (1 - m[i][j][d]))
+                            solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d])
 
     ##
     ## Underground belt constraints
@@ -206,27 +193,20 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
                         if inside_grid(ci, cj, grid_size):
                             # Entrance and exit flows sum to zero
                             solver.Add(
-                                f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] <= 
-                                large_M * (1 - u[i][j][d][n])
-                            )
-                            solver.Add(
-                                f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] >= 
-                                -large_M * (1 - u[i][j][d][n])
-                            )
+                                f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] + f[ci][cj][s][d] == 0
+                            ).only_enforce_if(u[i][j][d][n])
                             # Input flow is gte zero
-                            solver.Add(f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] >= -large_M * (1 - u[i][j][d][n]))
+                            solver.Add(f[i][j][s][DIRECTIONS.index(underground_entrance_flow_direction(DIRECTIONS[d]))] >= 0).only_enforce_if(u[i][j][d][n])
                             # Output flow is lte zero
-                            solver.Add(f[ci][cj][s][d] <= large_M * (1 - u[i][j][d][n]))
+                            solver.Add(f[ci][cj][s][d] <= 0).only_enforce_if(u[i][j][d][n])
 
                             # Zero flow from all the other directions in entrance
                             for dir in underground_entrance_zero_directions(DIRECTIONS[d]):
-                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
-                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
+                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(u[i][j][d][n])
 
                             # Zero flow from all the other directions in exit
                             for dir in underground_exit_zero_directions(DIRECTIONS[d]):
-                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] <= large_M * (1 - u[i][j][d][n]))
-                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] >= -large_M * (1 - u[i][j][d][n]))
+                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(u[i][j][d][n])
 
     # 12. No entrance between entrance and exit
     for i in range(W):
@@ -239,8 +219,7 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
                             if not inside_grid(ci, cj, grid_size):
                                 continue
                             for n3 in range(MAX_UNDERGROUND_DISTANCE):
-                                solver.Add(u[ci][cj][d2][n3] <= large_M * (1 - u[i][j][d][n]))
-                                solver.Add(u[ci][cj][d2][n3] >= -large_M * (1 - u[i][j][d][n]))
+                                solver.Add(u[ci][cj][d2][n3] == 0).only_enforce_if(u[i][j][d][n])
                                 
                             
 
@@ -249,7 +228,8 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
         i, j, d, s, flow = input
         solver.Add(f[i][j][s][DIRECTIONS.index(d)] == flow)
 
-    objective1 = solver.Sum(x[i][j] for i in range(W) for j in range(H))
+    objective1 = sum(x[i][j] for i in range(W) for j in range(H))
+    # solver.Minimize(objective1)
     solver.Minimize(objective1)
 
     # Configure the solver to use all available threads
@@ -262,25 +242,32 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, disable_be
             limits/solutions = 1
         """)
 
+    # solver.EnableOutput()
+
     # Solve the problem
-    status = solver.Solve()
+    # status = solver.Solve()
+
+    solver_cp = cp_model.CpSolver()
+    status = solver_cp.Solve(solver)
 
     # Output the results
-    if status == pywraplp.Solver.OPTIMAL or status == pywraplp.Solver.FEASIBLE:
-        print('Solution is', 'optimal' if status == pywraplp.Solver.OPTIMAL else 'feasible')
+    if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
+        print('Solution is', 'optimal' if status == cp_model.OPTIMAL else 'feasible')
         print('components:')
-        print(viz_components(b, m, u, grid_size))
+        print(viz_components(solver_cp, b, m, u, grid_size))
         print('occupied:')
-        print(viz_occupied(x, grid_size))
+        print(viz_occupied(solver_cp, x, grid_size))
         print('flows:')
-        print(viz_flows(f, grid_size, num_sources))
-        print(f'Minimum area: {solver.Objective().Value()}')
-        print('Blueprint')
-        print(encode_components_blueprint_json(b, m, u, grid_size))
-        return viz_components(b, m, u, grid_size)
-    else:
+        print(viz_flows(solver_cp, f, grid_size, num_sources))
+        # print(f'Minimum area: {solver.Objective().Value()}')
+        # print('Blueprint')
+        # print(encode_components_blueprint_json(solver_cp, b, m, u, grid_size))
+        return viz_components(solver_cp, b, m, u, grid_size)
+    elif status == cp_model.INFEASIBLE:
         print('No optimal solution found.')
         return None
+    else:
+        raise Exception(f'Unexpected solver status: {status}')
 
 # if main
 if __name__ == '__main__':
@@ -289,22 +276,60 @@ if __name__ == '__main__':
     # solve_factorio_belt_balancer((3, 3), 1, [
     #     (0, 2, 'N', 0, -1),
     #     (0, 0, 'S', 0, 1),
-    # ])
+    # ], 1, disable_underground=True)
+
+    # Mixer 2 x 1
+    # solve_factorio_belt_balancer((2, 1), 2, [
+    #     (0, 0, 'S', 0, 2),
+    #     (1, 0, 'S', 1, 2),
+    #     (0, 0, 'N', 0, -1),
+    #     (0, 0, 'N', 1, -1),
+    #     (1, 0, 'N', 0, -1),
+    #     (1, 0, 'N', 1, -1),
+    # ], 2)
 
     # # Single mixer balancer
     # solve_factorio_belt_balancer((2, 3), 2, [
-    #     (0, 0, 'S', 0, 1),
-    #     (1, 0, 'S', 1, 1),
-    #     (0, 2, 'N', 0, -0.5),
-    #     (0, 2, 'N', 1, -0.5),
-    #     (1, 2, 'N', 0, -0.5),
-    #     (1, 2, 'N', 1, -0.5),
-    # ])
+    #     (0, 0, 'S', 0, 2),
+    #     (1, 0, 'S', 1, 2),
+    #     (0, 2, 'N', 0, -1),
+    #     (0, 2, 'N', 1, -1),
+    #     (1, 2, 'N', 0, -1),
+    #     (1, 2, 'N', 1, -1),
+    # ], 2)
 
     # Undergroun 2 belts
-    solve_factorio_belt_balancer((5, 6), 2, [
-        (2, 0, 'S', 0, 1),
-        (3, 0, 'S', 1, 1),
-        (3, 5, 'N', 0, -1),
-        (2, 5, 'N', 1, -1),
-    ])
+    # solve_factorio_belt_balancer((5, 6), 2, [
+    #     (2, 0, 'S', 0, 1),
+    #     (3, 0, 'S', 1, 1),
+    #     (3, 5, 'N', 0, -1),
+    #     (2, 5, 'N', 1, -1),
+    # ])
+
+    # Balancer 4 x 4
+    solve_factorio_belt_balancer((4, 8), 4, [
+        (0, 0, 'S', 0, 16),
+        (1, 0, 'S', 1, 16),
+        (2, 0, 'S', 2, 16),
+        (3, 0, 'S', 3, 16),
+
+        (0, 7, 'N', 0, -4),
+        (0, 7, 'N', 1, -4),
+        (0, 7, 'N', 2, -4),
+        (0, 7, 'N', 3, -4),
+
+        (1, 7, 'N', 0, -4),
+        (1, 7, 'N', 1, -4),
+        (1, 7, 'N', 2, -4),
+        (1, 7, 'N', 3, -4),
+
+        (2, 7, 'N', 0, -4),
+        (2, 7, 'N', 1, -4),
+        (2, 7, 'N', 2, -4),
+        (2, 7, 'N', 3, -4),
+
+        (3, 7, 'N', 0, -4),
+        (3, 7, 'N', 1, -4),
+        (3, 7, 'N', 2, -4),
+        (3, 7, 'N', 3, -4),
+    ], 16)

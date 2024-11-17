@@ -4,7 +4,7 @@ from balancer import solve_factorio_belt_balancer
 class TestFactorioBalancer(unittest.TestCase):
 
     def test_solve_factorio_belt_balancer_single_cell_no_flow(self):
-        result = solve_factorio_belt_balancer((1, 1), 1, [], disable_underground=True)
+        result = solve_factorio_belt_balancer((1, 1), 1, [], 1, disable_underground=True)
         # No components
         self.assertEqual(result, '‧\n')
 
@@ -16,7 +16,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((1, 1), 1, [
             (0, 0, 'N', 0, -1),
             (0, 0, 'S', 0, 1),
-        ], disable_underground=True)
+        ], 1, disable_underground=True)
         # One belt that goes up
         self.assertEqual(result, '▲\n')
 
@@ -24,7 +24,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((1, 1), 1, [
             (0, 0, 'N', 0, 1),
             (0, 0, 'S', 0, -1),
-        ], disable_underground=True)
+        ], 1, disable_underground=True)
         # One belt that goes down
         self.assertEqual(result, '▼\n')
 
@@ -32,7 +32,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((2, 2), 1, [
             (0, 0, 'S', 0, 1),
             (0, 1, 'N', 0, -1),
-        ], disable_underground=True)
+        ], 1, disable_underground=True)
         # One belt that goes down
         self.assertEqual(result,
             '▲‧\n' +
@@ -43,7 +43,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((2, 2), 1, [
             (0, 1, 'N', 0, 1),
             (0, 0, 'S', 0, -1),
-        ], disable_underground=True)
+        ], 1, disable_underground=True)
         # One belt that goes down
         self.assertEqual(result,
             '▼‧\n' +
@@ -53,7 +53,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((3, 3), 1, [
             (0, 2, 'N', 0, 1),
             (0, 0, 'S', 0, -1),
-        ], disable_underground=True)
+        ], 1, disable_underground=True)
         # One belt that goes down
         self.assertEqual(result,
             '▼‧‧\n' +
@@ -65,7 +65,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((3, 3), 1, [
             (0, 2, 'N', 0, -1),
             (0, 0, 'S', 0, 1),
-        ], disable_underground=True)
+        ], 1, disable_underground=True)
         # One belt that goes up
         self.assertEqual(result,
             '▲‧‧\n' +
@@ -80,7 +80,7 @@ class TestFactorioBalancer(unittest.TestCase):
             (0, 0, 'S', 0, -1),
             (1, 1, 'N', 1, 1),
             (1, 0, 'S', 1, -1),
-        ], disable_underground=True)
+        ], 1, disable_underground=True)
         # Two parallel belts that go down
         self.assertEqual(result,
             '▼▼\n' +
@@ -94,13 +94,13 @@ class TestFactorioBalancer(unittest.TestCase):
     def test_solve_factorio_belt_balancer_mixer_2_1(self):
         # Two flows in parallel that need to be mixed
         result = solve_factorio_belt_balancer((2, 1), 2, [
-            (0, 0, 'S', 0, 1),
-            (1, 0, 'S', 1, 1),
-            (0, 0, 'N', 0, -0.5),
-            (0, 0, 'N', 1, -0.5),
-            (1, 0, 'N', 0, -0.5),
-            (1, 0, 'N', 1, -0.5),
-        ])
+            (0, 0, 'S', 0, 2),
+            (1, 0, 'S', 1, 2),
+            (0, 0, 'N', 0, -1),
+            (0, 0, 'N', 1, -1),
+            (1, 0, 'N', 0, -1),
+            (1, 0, 'N', 1, -1),
+        ], 2)
         # Single mixer that gos up
         self.assertEqual(result,
             '↿↾\n'
@@ -109,33 +109,33 @@ class TestFactorioBalancer(unittest.TestCase):
     def test_solve_factorio_belt_balancer_mixer_belt_2_2(self):
         # Two flows in parallel, requires two belts
         result = solve_factorio_belt_balancer((2, 2), 2, [
-            (0, 0, 'S', 0, 1),
-            (1, 0, 'S', 1, 1),
-            (0, 1, 'N', 0, -0.5),
-            (0, 1, 'N', 1, -0.5),
-            (1, 1, 'N', 0, -0.5),
-            (1, 1, 'N', 1, -0.5),
-        ])
+            (0, 0, 'S', 0, 2),
+            (1, 0, 'S', 1, 2),
+            (0, 1, 'N', 0, -1),
+            (0, 1, 'N', 1, -1),
+            (1, 1, 'N', 0, -1),
+            (1, 1, 'N', 1, -1),
+        ], 2)
         # Single mixer that goes up
         self.assertEqual(result,
-            '▲▲\n'
             '↿↾\n'
+            '▲▲\n'
         )
 
     def test_solve_factorio_belt_balancer_mixer_belt_2_3(self):
         # Two flows in parallel, requires two belts
         result = solve_factorio_belt_balancer((2, 3), 2, [
-            (0, 0, 'S', 0, 1),
-            (1, 0, 'S', 1, 1),
-            (0, 2, 'N', 0, -0.5),
-            (0, 2, 'N', 1, -0.5),
-            (1, 2, 'N', 0, -0.5),
-            (1, 2, 'N', 1, -0.5),
-        ])
+            (0, 0, 'S', 0, 2),
+            (1, 0, 'S', 1, 2),
+            (0, 2, 'N', 0, -1),
+            (0, 2, 'N', 1, -1),
+            (1, 2, 'N', 0, -1),
+            (1, 2, 'N', 1, -1),
+        ], 2)
         # Single mixer that goes up
         self.assertEqual(result,
-            '▲▲\n'
-            '▲▲\n'
+            '↿↾\n'
+            '↿↾\n'
             '↿↾\n'
         )
 
@@ -147,7 +147,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((1, 2), 1, [
             (0, 0, 'S', 0, 1),
             (0, 1, 'N', 0, -1),
-        ], disable_belt=True)
+        ], 1, disable_belt=True)
         # Single underground belt that goes up no spaces
         self.assertEqual(result,
             '↥\n'
@@ -158,7 +158,7 @@ class TestFactorioBalancer(unittest.TestCase):
         result = solve_factorio_belt_balancer((1, 3), 1, [
             (0, 0, 'S', 0, 1),
             (0, 2, 'N', 0, -1),
-        ], disable_belt=True)
+        ], 1, disable_belt=True)
         # Single underground belt that goes up
         self.assertEqual(result,
             '↥\n'
@@ -173,7 +173,7 @@ class TestFactorioBalancer(unittest.TestCase):
             (1, 0, 'S', 0, 1),
             (0, 2, 'N', 0, -1),
             (1, 2, 'N', 0, -1),
-        ], disable_belt=True)
+        ], 1, disable_belt=True)
         # Single underground belt that goes up
         self.assertEqual(result,
             '↥↥\n'
