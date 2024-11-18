@@ -32,3 +32,23 @@ solve_factorio_belt_balancer((5, 6), 2, [
     (2, 5, 'N', 1, -1),
 ])
 ```
+
+- Adding feasibility mode rather than optimal solution only
+- Discretizing continuous flow into integer flow
+- Migrate to CP-SAT
+
+
+## Notable solutions
+- 8x8 grid
+```
+↿↾↿↾↿↾↿↾
+↥↥▲↥↥↥↥↥
+‧‧▲◀◀△‧△
+‧▶▷‧↿↾↦▲
+△▲◀‧▲▲◀◀
+▲↤↥‧▲◁◀↥
+▶▶▶▶▲▶▲‧
+↥△△△△▲△‧
+△↿↾↿↾↿↾△
+↿↾↿↾↿↾↿↾
+```

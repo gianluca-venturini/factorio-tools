@@ -229,25 +229,19 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, 
         solver.Add(f[i][j][s][DIRECTIONS.index(d)] == flow)
 
     objective1 = sum(x[i][j] for i in range(W) for j in range(H))
-    # solver.Minimize(objective1)
     solver.Minimize(objective1)
 
     # Configure the solver to use all available threads
     if max_parallel:
         solver.SetSolverSpecificParametersAsString("parallel/maxnthreads=0")  # Use all threads
 
-    if feasible_ok:
-        solver.SetSolverSpecificParametersAsString("""
-            limits/time = 10
-            limits/solutions = 1
-        """)
-
-    # solver.EnableOutput()
-
-    # Solve the problem
-    # status = solver.Solve()
-
     solver_cp = cp_model.CpSolver()
+    solver_cp.parameters.log_search_progress = True  # This enables solver output
+    
+    if feasible_ok:
+        # Set 10 minute time limit
+        solver_cp.parameters.max_time_in_seconds = 600
+
     status = solver_cp.Solve(solver)
 
     # Output the results
@@ -326,29 +320,113 @@ if __name__ == '__main__':
     # ], 24)
 
     # Balancer 4 x 4
-    solve_factorio_belt_balancer((4, 8), 4, [
-        (0, 0, 'S', 0, 16),
-        (1, 0, 'S', 1, 16),
-        (2, 0, 'S', 2, 16),
-        (3, 0, 'S', 3, 16),
+    # solve_factorio_belt_balancer((4, 8), 4, [
+    #     (0, 0, 'S', 0, 16),
+    #     (1, 0, 'S', 1, 16),
+    #     (2, 0, 'S', 2, 16),
+    #     (3, 0, 'S', 3, 16),
 
-        (0, 7, 'N', 0, -4),
-        (0, 7, 'N', 1, -4),
-        (0, 7, 'N', 2, -4),
-        (0, 7, 'N', 3, -4),
+    #     (0, 7, 'N', 0, -4),
+    #     (0, 7, 'N', 1, -4),
+    #     (0, 7, 'N', 2, -4),
+    #     (0, 7, 'N', 3, -4),
 
-        (1, 7, 'N', 0, -4),
-        (1, 7, 'N', 1, -4),
-        (1, 7, 'N', 2, -4),
-        (1, 7, 'N', 3, -4),
+    #     (1, 7, 'N', 0, -4),
+    #     (1, 7, 'N', 1, -4),
+    #     (1, 7, 'N', 2, -4),
+    #     (1, 7, 'N', 3, -4),
 
-        (2, 7, 'N', 0, -4),
-        (2, 7, 'N', 1, -4),
-        (2, 7, 'N', 2, -4),
-        (2, 7, 'N', 3, -4),
+    #     (2, 7, 'N', 0, -4),
+    #     (2, 7, 'N', 1, -4),
+    #     (2, 7, 'N', 2, -4),
+    #     (2, 7, 'N', 3, -4),
 
-        (3, 7, 'N', 0, -4),
-        (3, 7, 'N', 1, -4),
-        (3, 7, 'N', 2, -4),
-        (3, 7, 'N', 3, -4),
-    ], 16)
+    #     (3, 7, 'N', 0, -4),
+    #     (3, 7, 'N', 1, -4),
+    #     (3, 7, 'N', 2, -4),
+    #     (3, 7, 'N', 3, -4),
+    # ], 16)
+
+    # Balancer 8 x 8
+    solve_factorio_belt_balancer((8, 10), 8, [
+        (0, 0, 'S', 0, 8),
+        (1, 0, 'S', 1, 8),
+        (2, 0, 'S', 2, 8),
+        (3, 0, 'S', 3, 8),
+        (4, 0, 'S', 4, 8),
+        (5, 0, 'S', 5, 8),
+        (6, 0, 'S', 6, 8),
+        (7, 0, 'S', 7, 8),
+
+        (0, 9, 'N', 0, -1),
+        (0, 9, 'N', 1, -1),
+        (0, 9, 'N', 2, -1),
+        (0, 9, 'N', 3, -1),
+        (0, 9, 'N', 4, -1),
+        (0, 9, 'N', 5, -1),
+        (0, 9, 'N', 6, -1),
+        (0, 9, 'N', 7, -1),
+
+        (1, 9, 'N', 0, -1),
+        (1, 9, 'N', 1, -1),
+        (1, 9, 'N', 2, -1),
+        (1, 9, 'N', 3, -1),
+        (1, 9, 'N', 4, -1),
+        (1, 9, 'N', 5, -1),
+        (1, 9, 'N', 6, -1),
+        (1, 9, 'N', 7, -1),
+
+        (2, 9, 'N', 0, -1),
+        (2, 9, 'N', 1, -1),
+        (2, 9, 'N', 2, -1),
+        (2, 9, 'N', 3, -1),
+        (2, 9, 'N', 4, -1),
+        (2, 9, 'N', 5, -1),
+        (2, 9, 'N', 6, -1),
+        (2, 9, 'N', 7, -1),
+
+        (3, 9, 'N', 0, -1),
+        (3, 9, 'N', 1, -1),
+        (3, 9, 'N', 2, -1),
+        (3, 9, 'N', 3, -1),
+        (3, 9, 'N', 4, -1),
+        (3, 9, 'N', 5, -1),
+        (3, 9, 'N', 6, -1),
+        (3, 9, 'N', 7, -1),
+
+        (4, 9, 'N', 0, -1),
+        (4, 9, 'N', 1, -1),
+        (4, 9, 'N', 2, -1),
+        (4, 9, 'N', 3, -1),
+        (4, 9, 'N', 4, -1),
+        (4, 9, 'N', 5, -1),
+        (4, 9, 'N', 6, -1),
+        (4, 9, 'N', 7, -1),
+
+        (5, 9, 'N', 0, -1),
+        (5, 9, 'N', 1, -1),
+        (5, 9, 'N', 2, -1),
+        (5, 9, 'N', 3, -1),
+        (5, 9, 'N', 4, -1),
+        (5, 9, 'N', 5, -1),
+        (5, 9, 'N', 6, -1),
+        (5, 9, 'N', 7, -1),
+
+        (6, 9, 'N', 0, -1),
+        (6, 9, 'N', 1, -1),
+        (6, 9, 'N', 2, -1),
+        (6, 9, 'N', 3, -1),
+        (6, 9, 'N', 4, -1),
+        (6, 9, 'N', 5, -1),
+        (6, 9, 'N', 6, -1),
+        (6, 9, 'N', 7, -1),
+
+        (7, 9, 'N', 0, -1),
+        (7, 9, 'N', 1, -1),
+        (7, 9, 'N', 2, -1),
+        (7, 9, 'N', 3, -1),
+        (7, 9, 'N', 4, -1),
+        (7, 9, 'N', 5, -1),
+        (7, 9, 'N', 6, -1),
+        (7, 9, 'N', 7, -1),
+    ], 8, feasible_ok=True)
