@@ -240,9 +240,10 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, 
     
     if feasible_ok:
         # Set 10 minute time limit
-        solver_cp.parameters.max_time_in_seconds = 10800
+        solver_cp.parameters.max_time_in_seconds = 300
 
     status = solver_cp.Solve(solver)
+    print(solver_cp.ResponseStats())
 
     # Output the results
     if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
