@@ -39,7 +39,7 @@ solve_factorio_belt_balancer((5, 6), 2, [
 
 
 ## Notable solutions
-- 6x6 grid
+- 6x6 balancer on 8x9 grid
 ```
 ‧‧↿↾↿↾↿↾
 ‧‧▲↿↾↥↥▲
@@ -52,7 +52,7 @@ solve_factorio_belt_balancer((5, 6), 2, [
 ‧‧↿↾↿↾↿↾
 ```
 
-- 8x8 grid
+- 8x8 balancer on 8x10 grid
 ```
 ↿↾↿↾↿↾↿↾
 ↥↥▲↥↥↥↥↥
