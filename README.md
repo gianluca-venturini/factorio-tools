@@ -21,6 +21,7 @@ echo "my_base64_string_without_first_byte" | base64 -D | zlib-flate -uncompress
 
 
 ## Performance improvements
+- Start with MIP model and SCIP
 - Inverting two flows
     - Optimal solution is 13.
     - with occupied cell variabe: 1m 3s
@@ -32,6 +33,7 @@ solve_factorio_belt_balancer((5, 6), 2, [
     (2, 5, 'N', 1, -1),
 ])
 ```
+- balancer 4x4 is computationally infeasible with naiive MIP model and SCIP
 
 - Adding feasibility mode rather than optimal solution only
 - Discretizing continuous flow into integer flow
@@ -39,20 +41,20 @@ solve_factorio_belt_balancer((5, 6), 2, [
 
 
 ## Notable solutions
-- 6x6 balancer on 8x9 grid
+- 6x6 balancer on 8x9 grid feasible in 3min
 ```
-‧‧↿↾↿↾↿↾
-‧‧▲↿↾↥↥▲
-▶▷▲↥↥‧↦▲
-↥‧▲◀◀△‧‧
-‧‧▼◀↿↾‧‧
-△⇃⇂↿↾▲◀◀
-▲◀▶▲▲◀△↥
-‧↿↾△△↿↾△
-‧‧↿↾↿↾↿↾
+↿↾↿↾↿↾‧‧
+↥↥↥↿↾↥‧‧
+‧‧‧↥↥△‧‧
+△‧△▶▶▲‧‧
+▲↤↿↾▶▼◁◀
+▶▶▲↿↾⇃⇂▲
+↥△▶▲▲◀▶▲
+△↿↾△△↿↾‧
+↿↾↿↾↿↾‧‧
 ```
 
-- 8x8 balancer on 8x10 grid
+- 8x8 balancer on 8x10 grid feasible in 30min
 ```
 ↿↾↿↾↿↾↿↾
 ↥↥▲↥↥↥↥↥
