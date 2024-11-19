@@ -131,12 +131,12 @@ class TestFactorioBalancer(unittest.TestCase):
             (0, 2, 'N', 1, -1),
             (1, 2, 'N', 0, -1),
             (1, 2, 'N', 1, -1),
-        ], 2)
+        ], 2, disable_underground=True)
         # Single mixer that goes up
         self.assertEqual(result,
             '↿↾\n'
-            '↿↾\n'
-            '↿↾\n'
+            '▲▲\n'
+            '▲▲\n'
         )
 
     ###
