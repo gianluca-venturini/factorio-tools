@@ -8,7 +8,7 @@ DIRECTIONS = ('N', 'S', 'E', 'W')
 # Maximum distance between entrance and exit of the underground belt
 # it's just the cells between the entrance and exit cell, without counting them
 # e.g. distance 0 means that entrance and exit are adjacent
-MAX_UNDERGROUND_DISTANCE = 6
+MAX_UNDERGROUND_DISTANCE = 8
 
 BELT_INPUT_DIRECTIONS = {
     'N': ['S', 'E', 'W'],
