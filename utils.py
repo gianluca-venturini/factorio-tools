@@ -4,6 +4,7 @@ import base64
 from itertools import count
 
 DIRECTIONS = ('N', 'S', 'E', 'W')
+FLOW_DIRECTIONS = ('S', 'E') # Only using half directions for the flow variable as optimization
 
 # Maximum distance between entrance and exit of the underground belt
 # it's just the cells between the entrance and exit cell, without counting them
@@ -69,6 +70,37 @@ MIXER_FIRST_CELL_BLUEPRINT_OFFSET = {
 EPSILON = 1e-5
 
 '''
+Flow variable helper function
+The function is more complex than just accessing the variables because as optimization
+only two flows are stored per cell
+'''
+def get_flow(f, i, j, s, d):
+    if d not in DIRECTIONS:
+        raise Exception(f'Invalid direction {d}')
+    # S and W are on cell i, j, while N is on i, j+1 and E is on i+1, j
+    CELL_FLOW = {
+        'S': (i, j),
+        'W': (i, j),
+        'N': (i, j+1),
+        'E': (i+1, j),
+    }
+    FLOW_DIRECTION_INDEX = {
+        'S': FLOW_DIRECTIONS.index('S'),
+        'E': FLOW_DIRECTIONS.index('E'),
+        'N': FLOW_DIRECTIONS.index('S'), # N is the other cell S
+        'W': FLOW_DIRECTIONS.index('E'), # W is the other cell E
+    }
+    # If the flow is in the next cell, the value should be inverted
+    FLOW_CONSTANT = {
+        'S': 1,
+        'E': 1,
+        'N': -1,
+        'W': -1,
+    }
+    ci, cj = CELL_FLOW[d]
+    return FLOW_CONSTANT[d] * f[ci][cj][s][FLOW_DIRECTION_INDEX[d]]
+
+'''
 Returns true if the mixer can be placed given the coordinates and direction of the first cell.
 Note that the mixer i, j are the left cell of the mixer, so we need to keep into
 account where the right cell is going to be based on the direction.
@@ -126,12 +158,6 @@ def mixer_input_direction(d):
     raise Exception('Invalid direction')
 
 '''
-Like mixer_input_direction but takes the index of the direction and output index
-'''
-def mixer_input_direction_idx(d):
-    return DIRECTIONS.index(mixer_input_direction(DIRECTIONS[d]))
-
-'''
 Returns the input direction of the mixer
 identity function since the mixer direction is defined as the output one
 '''
@@ -145,12 +171,6 @@ def mixer_output_direction(d):
     if d == 'W':
         return 'W'
     raise Exception('Invalid direction')
-
-'''
-Like mixer_output_direction but takes the index of the direction and output index
-'''
-def mixer_output_direction_idx(d):
-    return DIRECTIONS.index(mixer_output_direction(DIRECTIONS[d]))
 
 '''
 Return the directions that have a flow of zero
@@ -357,8 +377,8 @@ def viz_flows(solver, f, grid_size, num_flows):
         for i in range(W):
             for d in range(len(DIRECTIONS)):
                 for s in range(num_flows):
-                    if solver.Value(f[i][j][s][d]) < -EPSILON or solver.Value(f[i][j][s][d]) > EPSILON:
-                        result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){solver.Value(f[i][j][s][d])} "
+                    if solver.Value(get_flow(f, i, j, s, DIRECTIONS[d])) < -EPSILON or solver.Value(get_flow(f, i, j, s, DIRECTIONS[d])) > EPSILON:
+                        result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){solver.Value(get_flow(f, i, j, s, DIRECTIONS[d]))} "
                 result += ' '
             result += '| '
         result += '\n'
