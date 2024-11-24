@@ -24,13 +24,17 @@ BELT_INPUT_DIRECTIONS = {
     'W': ['N', 'S', 'E'],
 }
 
+EMPTY_SYMBOL = '‧'
+OCCUPIED_SYMBOL = '■'
+
 # Synbols used for visualizing the belt based on direction
-DIRECTIONS_SYMBOL = {
+BELT_SYMBOL = {
     'N': '▲',
     'S': '▼',
     'E': '▶',
     'W': '◀',
 }
+
 # Symbols used for visualizing the mixer based on direction
 # since the mixer has two cells we have two different symbols (cell1, cell2)
 MIXER_SYMBOL = {
@@ -264,7 +268,7 @@ def viz_occupied(solver, x, grid_size):
     for j in range(H-1, -1, -1):
         # Iterate backward since Y axis is inverted
         for i in range(W):
-            result += '■' if solver.Value(x[i][j]) > 0 else '‧'
+            result += OCCUPIED_SYMBOL if solver.Value(x[i][j]) > 0 else EMPTY_SYMBOL
         result += '\n'
     return result
 
@@ -274,7 +278,7 @@ def viz_belts(solver, b, grid_size):
     # Iterate backward since Y axis is inverted
     for j in range(H-1, -1, -1):
         for i in range(W):
-            result += ''.join([f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}" if solver.Value(b[i][j][d]) > 0 else '' for d in range(len(DIRECTIONS))]) if sum(solver.Value(b[i][j][d]) for d in range(len(DIRECTIONS))) > 0 else 'O'
+            result += ''.join([f"{BELT_SYMBOL[DIRECTIONS[d]]}" if solver.Value(b[i][j][d]) > 0 else '' for d in range(len(DIRECTIONS))]) if sum(solver.Value(b[i][j][d]) for d in range(len(DIRECTIONS))) > 0 else 'O'
         result += '\n'
     return result
 
@@ -285,7 +289,7 @@ def viz_components(solver, variables, grid_size):
     result = ''
     def render_b(i, j, d):
         nonlocal result
-        result += f"{DIRECTIONS_SYMBOL[d]}"
+        result += f"{BELT_SYMBOL[d]}"
     def render_m(i, j, d, c):
         nonlocal result
         result += f"{MIXER_SYMBOL[d][c]}"
@@ -297,7 +301,7 @@ def viz_components(solver, variables, grid_size):
         result += f"{UNDERGROUND_BELT_SYMBOL[d][1]}"
     def render_empty():
         nonlocal result
-        result += '‧'
+        result += EMPTY_SYMBOL
     def render_new_line():
         nonlocal result
         result += '\n'
@@ -363,14 +367,14 @@ def viz_flows(solver, f, grid_size, num_flows):
             for s in range(num_flows):
                 for d in range(len(DIRECTIONS)):
                     if solver.Value(f[i][j][s][d]) < -EPSILON or solver.Value(f[i][j][s][d]) > EPSILON:
-                        result += f" {DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){solver.Value(f[i][j][s][d]):>2}"
+                        result += f" {BELT_SYMBOL[DIRECTIONS[d]]}({s}){solver.Value(f[i][j][s][d]):>2}"
                     else :
-                        result += ' ‧‧‧‧‧‧'
+                        result += f' {EMPTY_SYMBOL * 6}'
             result += '|'
         result += '\n'
     return result
 
-def generate_entities_blueprint(solver, b, m, u, grid_size):
+def generate_entities_blueprint(solver, variables, grid_size):
     unique_entity_number_generator = count(1)
 
     result = []
@@ -443,3 +447,30 @@ def encode_components_blueprint_json(solver, b, m, u, grid_size):
     blueprint_string = '0' + base64_encoded
 
     return blueprint_string
+
+def load_solution(solver, variables, solution, grid_size):
+    normalize_solution = solution.replace('\n', '')
+    if len(normalize_solution) != grid_size[0] * grid_size[1]:
+        raise Exception(f'Invalid solution size: {len(normalize_solution)} != {grid_size[0] * grid_size[1]}')
+    W, H = grid_size
+    b, m, ua, ub = variables
+    # get an iterator of the solution that returns on characters every time
+    solution_iterator = iter(normalize_solution)
+    for j in range(H - 1, -1, -1):
+        for i in range(W):
+            char = next(solution_iterator)
+            if char == EMPTY_SYMBOL:
+                continue
+            if char in BELT_SYMBOL.values():
+                d = next(key for key, value in BELT_SYMBOL.items() if value == char)
+                solver.Add(b[i][j][DIRECTIONS.index(d)] == 1)
+            elif char in MIXER_SYMBOL.values():
+                d = next(key for key, value in MIXER_SYMBOL.items() if value[0] == char)
+                solver.Add(m[i][j][DIRECTIONS.index(d)] == 1)
+            elif char in UNDERGROUND_BELT_SYMBOL.values():
+                d = next(key for key, value in UNDERGROUND_BELT_SYMBOL.items() if value[0] == char or value[1] == char)
+                if char == UNDERGROUND_BELT_SYMBOL[d][0]:
+                    solver.Add(ua[i][j][DIRECTIONS.index(d)] == 1)
+                elif char == UNDERGROUND_BELT_SYMBOL[d][1]:
+                    solver.Add(ub[i][j][DIRECTIONS.index(d)] == 1)
+

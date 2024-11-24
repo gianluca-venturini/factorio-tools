@@ -181,5 +181,24 @@ class TestFactorioBalancer(unittest.TestCase):
             '△△\n'
         )
 
+    def test_load_solution(self):
+        result = solve_factorio_belt_balancer((2, 4), 1, [
+            (0, 0, 'S', 0, 2),
+            (0, 3, 'N', 0, -1),
+            (1, 3, 'N', 0, -1),
+        ], 2, solution=
+            '↿↾\n' +
+            '↥‧\n' +
+            '‧‧\n' +
+            '△‧\n'
+        )
+        # One belt that goes down
+        self.assertEqual(result,
+            '↿↾\n' +
+            '↥‧\n' +
+            '‧‧\n' +
+            '△‧\n'
+        )
+
 if __name__ == '__main__':
     unittest.main()
