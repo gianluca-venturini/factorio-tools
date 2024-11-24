@@ -5,6 +5,13 @@ from itertools import count
 
 DIRECTIONS = ('N', 'S', 'E', 'W')
 
+OPPOSITE_DIRECTIONS = {
+    'N': 'S',
+    'S': 'N',
+    'E': 'W',
+    'W': 'E',
+}
+
 # Maximum distance between entrance and exit of the underground belt
 # it's just the cells between the entrance and exit cell, without counting them
 # e.g. distance 0 means that entrance and exit are adjacent
@@ -274,7 +281,7 @@ def viz_belts(solver, b, grid_size):
 '''
 Visualizes all the components of the belt balancer
 '''
-def viz_components(solver, b, m, u, grid_size):
+def viz_components(solver, variables, grid_size):
     result = ''
     def render_b(i, j, d):
         nonlocal result
@@ -282,9 +289,12 @@ def viz_components(solver, b, m, u, grid_size):
     def render_m(i, j, d, c):
         nonlocal result
         result += f"{MIXER_SYMBOL[d][c]}"
-    def render_u(i, j, d, c):
+    def render_ua(i, j, d):
         nonlocal result
-        result += f"{UNDERGROUND_BELT_SYMBOL[d][c]}"
+        result += f"{UNDERGROUND_BELT_SYMBOL[d][0]}"
+    def render_ub(i, j, d):
+        nonlocal result
+        result += f"{UNDERGROUND_BELT_SYMBOL[d][1]}"
     def render_empty():
         nonlocal result
         result += '‧'
@@ -292,7 +302,7 @@ def viz_components(solver, b, m, u, grid_size):
         nonlocal result
         result += '\n'
 
-    visitor_components(solver, b, m, u, grid_size, render_new_line, render_empty, render_b, render_m, render_u)
+    visitor_components(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
     return result
 
 '''
@@ -300,8 +310,9 @@ Visit all the cells and call the render_*() functions to render all the elements
 It's guaranteed to complete the entire row before proceeding to the next one.
 Starts from coordinate 0, 0.
 '''
-def visitor_components(solver, b, m, u, grid_size, render_new_line, render_empty, render_b, render_m, render_u):
+def visitor_components(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub):
     W, H = grid_size
+    b, m, ua, ub = variables
     # Iterate backward since Y axis is inverted
     for j in range(H-1, -1, -1):
         for i in range(W):
@@ -328,23 +339,17 @@ def visitor_components(solver, b, m, u, grid_size, render_new_line, render_empty
                 if inside_grid(ci, cj, grid_size) and solver.Value(m[ci][cj][d]) > 0:
                     render_m(i, j, DIRECTIONS[d], 1)
                     found = True
-            # Visualize the underground belt entrance
+            # Visualize the underground belt
             for d in range(len(DIRECTIONS)):
                 if found:
                     break
-                for n in range(MAX_UNDERGROUND_DISTANCE):
-                    if solver.Value(u[i][j][d][n]) > 0:
-                        render_u(i, j, DIRECTIONS[d], 0)
-                        found = True
-            # Visualize the underground belt exit
-            for d in range(len(DIRECTIONS)):
-                if found:
+                if solver.Value(ua[i][j][d]) > 0:
+                    render_ua(i, j, DIRECTIONS[d])
+                    found = True
                     break
-                for n in range(MAX_UNDERGROUND_DISTANCE):
-                    ci, cj = underground_entrance_coordinates(i, j, DIRECTIONS[d], n)
-                    if inside_grid(ci, cj, grid_size) and solver.Value(u[ci][cj][d][n]) > 0:
-                        render_u(i, j, DIRECTIONS[d], 1)
-                        found = True
+                if solver.Value(ub[i][j][d]) > 0:
+                    render_ub(i, j, DIRECTIONS[d])
+                    found = True
             if not found:
                 render_empty()
         render_new_line()
@@ -355,12 +360,13 @@ def viz_flows(solver, f, grid_size, num_flows):
     # Iterate backward since Y axis is inverted
     for j in range(H-1, -1, -1):
         for i in range(W):
-            for d in range(len(DIRECTIONS)):
-                for s in range(num_flows):
+            for s in range(num_flows):
+                for d in range(len(DIRECTIONS)):
                     if solver.Value(f[i][j][s][d]) < -EPSILON or solver.Value(f[i][j][s][d]) > EPSILON:
-                        result += f"{DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){solver.Value(f[i][j][s][d])} "
-                result += ' '
-            result += '| '
+                        result += f" {DIRECTIONS_SYMBOL[DIRECTIONS[d]]}({s}){solver.Value(f[i][j][s][d]):>2}"
+                    else :
+                        result += ' ‧‧‧‧‧‧'
+            result += '|'
         result += '\n'
     return result
 
@@ -393,13 +399,16 @@ def generate_entities_blueprint(solver, b, m, u, grid_size):
             "type": "input" if c == 0 else "output",
             "direction": UNDERGROUND_BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d],
         })
-        pass
+    def render_ua(i, j, d):
+        render_u(i, j, d, 0)
+    def render_ub(i, j, d):
+        render_u(i, j, d, 1)
     def render_empty():
         pass
     def render_new_line():
         pass
 
-    visitor_components(solver, b, m, u, grid_size, render_new_line, render_empty, render_b, render_m, render_u)
+    visitor_components(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
     return result
 
 def encode_components_blueprint_json(solver, b, m, u, grid_size):
