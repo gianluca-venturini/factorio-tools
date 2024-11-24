@@ -68,7 +68,7 @@ solve_factorio_belt_balancer((5, 6), 2, [
 ↿↾↿↾↿↾↿↾
 ```
 
-- new belt design in 15min
+- new underground belt design in 15min
 ```
 ↿↾↿↾↿↾↿↾
 ↥↥↥▲↥↥↥▲
