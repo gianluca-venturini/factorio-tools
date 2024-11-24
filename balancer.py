@@ -1,5 +1,5 @@
 from ortools.sat.python import cp_model
-from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, DIRECTIONS_SYMBOL, MIXER_SYMBOL, MAX_UNDERGROUND_DISTANCE, OPPOSITE_DIRECTIONS, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx, underground_exit_coordinates, underground_entrance_coordinates, underground_entrance_zero_directions, underground_exit_zero_directions, underground_entrance_flow_direction
+from utils import DIRECTIONS, BELT_INPUT_DIRECTIONS, MAX_UNDERGROUND_DISTANCE, OPPOSITE_DIRECTIONS, encode_components_blueprint_json, viz_flows, viz_belts, viz_occupied, viz_components, mixer_can_be_placed, mixer_second_cell, mixer_first_cell, mixer_input_direction, mixer_output_direction, mixer_zero_directions, inside_grid, mixer_input_direction_idx, mixer_output_direction_idx, underground_exit_coordinates, underground_entrance_coordinates, underground_entrance_zero_directions, underground_exit_zero_directions, underground_entrance_flow_direction, load_solution
 
 '''
 Finds the minimum area of a belt balancer for a given grid size and input flows
@@ -8,7 +8,7 @@ grid_size: tuple (W, H) where W is the width and H is the height of the grid
 num_sources: int number of flow sources
 input_flows: list of tuples (i, j, d, flow) where i, j are the coordinates of the flow source, d is the direction of the flow, s the source number, and flow is the flow value
 '''
-def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, disable_belt=False, disable_underground=False, max_parallel=False, feasible_ok=False):
+def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, disable_belt=False, disable_underground=False, max_parallel=False, feasible_ok=False, solution=None, disable_solve=False):
     # Grid size
     W, H = grid_size
 
@@ -31,6 +31,8 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, 
     f = [[[[solver.NewIntVar(-max_flow, max_flow, f'f_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
     # underground flow of a source in a direction
     uf = [[[[solver.NewIntVar(-max_flow, max_flow, f'uf_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
+
+    variables = (b, m, ua, ub)
 
     # Constraints
     
@@ -297,6 +299,9 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, 
         i, j, d, s, flow = input
         solver.Add(f[i][j][s][DIRECTIONS.index(d)] == flow)
 
+    if solution is not None:
+        load_solution(solver, variables, solution, grid_size)
+
     objective1 = sum(x[i][j] for i in range(W) for j in range(H))
     solver.Minimize(objective1)
 
@@ -311,14 +316,17 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, 
         # Set 10 minute time limit
         solver_cp.parameters.max_time_in_seconds = 300
 
-    status = solver_cp.Solve(solver)
-    print(solver_cp.ResponseStats())
+    if disable_solve:
+        # Do not solve
+        status = cp_model.UNKNOWN
+    else:
+        status = solver_cp.Solve(solver)
 
     # Output the results
     if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
         print('Solution is', 'optimal' if status == cp_model.OPTIMAL else 'feasible')
         print('components:')
-        print(viz_components(solver_cp, (b, m, ua, ub), grid_size))
+        print(viz_components(solver_cp, variables, grid_size))
         print('occupied:')
         print(viz_occupied(solver_cp, x, grid_size))
         print('flows:')
@@ -328,12 +336,15 @@ def solve_factorio_belt_balancer(grid_size, num_sources, input_flows, max_flow, 
         # print(f'Minimum area: {solver.Objective().Value()}')
         # print('Blueprint')
         # print(encode_components_blueprint_json(solver_cp, b, m, u, grid_size))
-        return viz_components(solver_cp, (b, m, ua, ub), grid_size)
+        return viz_components(solver_cp, variables, grid_size)
     elif status == cp_model.INFEASIBLE:
         print('No optimal solution found.')
         return None
+    elif status == cp_model.UNKNOWN:
+        print('Not known if solution exists or its optimal.')
+        return None
     else:
-        raise Exception(f'Unexpected solver status: {status}')
+        raise Exception(f'Unexpected solver status: {status}.')
 
 # if main
 if __name__ == '__main__':
@@ -419,57 +430,93 @@ if __name__ == '__main__':
     #     (3, 6, 'N', 3, -4),
     # ], 16)
 
+    # Balancer 4 x 4 with solution
+    solve_factorio_belt_balancer((4, 7), 4, [
+        (0, 0, 'S', 0, 16),
+        (1, 0, 'S', 1, 16),
+        (2, 0, 'S', 2, 16),
+        (3, 0, 'S', 3, 16),
+
+        (0, 6, 'N', 0, -4),
+        (0, 6, 'N', 1, -4),
+        (0, 6, 'N', 2, -4),
+        (0, 6, 'N', 3, -4),
+
+        (1, 6, 'N', 0, -4),
+        (1, 6, 'N', 1, -4),
+        (1, 6, 'N', 2, -4),
+        (1, 6, 'N', 3, -4),
+
+        (2, 6, 'N', 0, -4),
+        (2, 6, 'N', 1, -4),
+        (2, 6, 'N', 2, -4),
+        (2, 6, 'N', 3, -4),
+
+        (3, 6, 'N', 0, -4),
+        (3, 6, 'N', 1, -4),
+        (3, 6, 'N', 2, -4),
+        (3, 6, 'N', 3, -4),
+    ], 16, solution=
+        '↥↿↾↥\n' +
+        '‧↥↥△\n' +
+        '△▶▶▲\n' +
+        '↿↾‧‧\n' +
+        '↥▲◀◀\n' +
+        '△△△▲\n' +
+        '↿↾↿↾\n'
+    )
+
     # Balancer 6 x 6
-    solve_factorio_belt_balancer((8, 9), 6, [
-        (1, 0, 'S', 0, 48),
-        (2, 0, 'S', 1, 48),
-        (3, 0, 'S', 2, 48),
-        (4, 0, 'S', 3, 48),
-        (5, 0, 'S', 4, 48),
-        (6, 0, 'S', 5, 48),
+    # solve_factorio_belt_balancer((8, 9), 6, [
+    #     (1, 0, 'S', 0, 48),
+    #     (2, 0, 'S', 1, 48),
+    #     (3, 0, 'S', 2, 48),
+    #     (4, 0, 'S', 3, 48),
+    #     (5, 0, 'S', 4, 48),
+    #     (6, 0, 'S', 5, 48),
 
-        (0, 8, 'N', 0, -8),
-        (0, 8, 'N', 1, -8),
-        (0, 8, 'N', 2, -8),
-        (0, 8, 'N', 3, -8),
-        (0, 8, 'N', 4, -8),
-        (0, 8, 'N', 5, -8),
+    #     (0, 8, 'N', 0, -8),
+    #     (0, 8, 'N', 1, -8),
+    #     (0, 8, 'N', 2, -8),
+    #     (0, 8, 'N', 3, -8),
+    #     (0, 8, 'N', 4, -8),
+    #     (0, 8, 'N', 5, -8),
 
-        (1, 8, 'N', 0, -8),
-        (1, 8, 'N', 1, -8),
-        (1, 8, 'N', 2, -8),
-        (1, 8, 'N', 3, -8),
-        (1, 8, 'N', 4, -8),
-        (1, 8, 'N', 5, -8),
+    #     (1, 8, 'N', 0, -8),
+    #     (1, 8, 'N', 1, -8),
+    #     (1, 8, 'N', 2, -8),
+    #     (1, 8, 'N', 3, -8),
+    #     (1, 8, 'N', 4, -8),
+    #     (1, 8, 'N', 5, -8),
 
-        (2, 8, 'N', 0, -8),
-        (2, 8, 'N', 1, -8),
-        (2, 8, 'N', 2, -8),
-        (2, 8, 'N', 3, -8),
-        (2, 8, 'N', 4, -8),
-        (2, 8, 'N', 5, -8),
+    #     (2, 8, 'N', 0, -8),
+    #     (2, 8, 'N', 1, -8),
+    #     (2, 8, 'N', 2, -8),
+    #     (2, 8, 'N', 3, -8),
+    #     (2, 8, 'N', 4, -8),
+    #     (2, 8, 'N', 5, -8),
 
-        (3, 8, 'N', 0, -8),
-        (3, 8, 'N', 1, -8),
-        (3, 8, 'N', 2, -8),
-        (3, 8, 'N', 3, -8),
-        (3, 8, 'N', 4, -8),
-        (3, 8, 'N', 5, -8),
+    #     (3, 8, 'N', 0, -8),
+    #     (3, 8, 'N', 1, -8),
+    #     (3, 8, 'N', 2, -8),
+    #     (3, 8, 'N', 3, -8),
+    #     (3, 8, 'N', 4, -8),
+    #     (3, 8, 'N', 5, -8),
 
-        (4, 8, 'N', 0, -8),
-        (4, 8, 'N', 1, -8),
-        (4, 8, 'N', 2, -8),
-        (4, 8, 'N', 3, -8),
-        (4, 8, 'N', 4, -8),
-        (4, 8, 'N', 5, -8),
+    #     (4, 8, 'N', 0, -8),
+    #     (4, 8, 'N', 1, -8),
+    #     (4, 8, 'N', 2, -8),
+    #     (4, 8, 'N', 3, -8),
+    #     (4, 8, 'N', 4, -8),
+    #     (4, 8, 'N', 5, -8),
 
-        (5, 8, 'N', 0, -8),
-        (5, 8, 'N', 1, -8),
-        (5, 8, 'N', 2, -8),
-        (5, 8, 'N', 3, -8),
-        (5, 8, 'N', 4, -8),
-        (5, 8, 'N', 5, -8),
-    ], 48)
+    #     (5, 8, 'N', 0, -8),
+    #     (5, 8, 'N', 1, -8),
+    #     (5, 8, 'N', 2, -8),
+    #     (5, 8, 'N', 3, -8),
+    #     (5, 8, 'N', 4, -8),
+    #     (5, 8, 'N', 5, -8),
+    # ], 48)
 
     # Balancer 6 x 6
     # Larger -- not tested
@@ -775,3 +822,13 @@ if __name__ == '__main__':
     #     (15, 15, 'N', 8, -1), (15, 15, 'N', 9, -1), (15, 15, 'N', 10, -1), (15, 15, 'N', 11, -1),
     #     (15, 15, 'N', 12, -1), (15, 15, 'N', 13, -1), (15, 15, 'N', 14, -1), (15, 15, 'N', 15, -1),
     # ], 16)
+
+    # # Single belt balancer with solution
+    # solve_factorio_belt_balancer((3, 3), 1, [
+    #     (0, 2, 'N', 0, -1),
+    #     (0, 0, 'S', 0, 1),
+    # ], 1, solution=
+    #     '▲‧‧\n' +
+    #     '▲‧‧\n' +
+    #     '▲‧‧\n'
+    # )

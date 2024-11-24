@@ -41,6 +41,17 @@ solve_factorio_belt_balancer((5, 6), 2, [
 
 
 ## Notable solutions
+- 4x4 balancer
+```
+↥↿↾↥
+‧↥↥△
+△▶▶▲
+↿↾‧‧
+↥▲◀◀
+△△△▲
+↿↾↿↾
+```
+
 - 6x6 balancer on 8x9 grid feasible in 3min
 ```
 ↿↾↿↾↿↾‧‧
