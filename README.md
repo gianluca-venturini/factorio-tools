@@ -131,4 +131,5 @@ solve_factorio_belt_balancer((5, 6), 2, [
 ↿↾↿↾↿↾↿↾
 ```
 
-- with solution hints
+- with solution fixing two rows and 2 cells finds solution in 83s
+- with solution fixing two rows and 2 cells and hint to uf=0 finds solution in 17s

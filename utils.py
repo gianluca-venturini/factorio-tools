@@ -261,6 +261,20 @@ def underground_entrance_flow_direction(d):
         return 'E'
     raise Exception('Invalid direction')
 
+'''
+Given a cell and a direction, returns the next cell in that direction.
+'''
+def next_cell(i, j, d):
+    if d == 'N':
+        return (i, j + 1)
+    if d == 'S':
+        return (i, j - 1)
+    if d == 'E':
+        return (i + 1, j)
+    if d == 'W':
+        return (i - 1, j)
+    raise Exception('Invalid direction')
+
 def viz_occupied(solver, x, grid_size):
     W, H = grid_size
     result = ''
@@ -448,8 +462,14 @@ def encode_components_blueprint_json(solver, b, m, u, grid_size):
 
     return blueprint_string
 
+provided_solution = set()
 def load_solution(solver, variables, solution, grid_size, is_hint=False):
+
     def add_solution(variable, value):
+        if variable.name in provided_solution:
+            # Skip variables that have already been set
+            return
+        provided_solution.add(variable.name)
         if is_hint:
             solver.AddHint(variable, value)
         else:
