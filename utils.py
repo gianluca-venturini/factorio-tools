@@ -470,10 +470,10 @@ def load_solution(solver, variables, solution, grid_size, is_hint=False):
             if char in BELT_SYMBOL.values():
                 d = next(key for key, value in BELT_SYMBOL.items() if value == char)
                 add_solution(b[i][j][DIRECTIONS.index(d)], 1)
-            elif char in MIXER_SYMBOL.values():
+            elif char in [v[0] for v in MIXER_SYMBOL.values()]:
                 d = next(key for key, value in MIXER_SYMBOL.items() if value[0] == char)
                 add_solution(m[i][j][DIRECTIONS.index(d)], 1)
-            elif char in UNDERGROUND_BELT_SYMBOL.values():
+            elif any(char in v for v in UNDERGROUND_BELT_SYMBOL.values()):
                 d = next(key for key, value in UNDERGROUND_BELT_SYMBOL.items() if value[0] == char or value[1] == char)
                 if char == UNDERGROUND_BELT_SYMBOL[d][0]:
                     add_solution(ua[i][j][DIRECTIONS.index(d)], 1)
