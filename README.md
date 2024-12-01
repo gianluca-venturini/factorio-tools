@@ -38,6 +38,44 @@ solve_factorio_belt_balancer((5, 6), 2, [
 - Adding feasibility mode rather than optimal solution only
 - Discretizing continuous flow into integer flow
 - Migrate to CP-SAT
+- Migrated undeground representation to lower dimensionality and more constraints
+- Used directly component variables in objective function (-16%)
+    - before: 75s
+    - after 63s
+- use Hint with an order that reflects the likelyhood
+    - 6x6 top 2 rows hidden
+        - optimal
+            - without: (90.8856)
+            - hint: belts=1 (82.0006) -- better
+            - hint: mixers=1 (85.1349) -- better
+            - hint: underground=1 (80.5116) -- best?
+            - hint: belts=1, mixers=1, underground=1 (82.0006) -- better
+        - feasible
+            - without (17.1655)
+            - hint: belts=1 (7.08848) -- better
+            - hint: mixers=1 (23.7942) -- worse
+            - hint: underground=1 (19.2976) -- worse
+            - hint: belts=1, mixers=0 (7.08848) -- better, but identical to previous
+            - hint: belts=1, mixers=1, underground=1 (7.08848) -- better, identical
+            - hint: belts=0, mixers=1, underground=0 (6.49246) -- best
+            - DecisionStrategy belts=1, mixers=0, underground=0: (17.1655) -- identical because IDK how to use it
+    - 6x6 top 2 rows hidden - no underground distance contraints
+        - feasible
+            - without (10.2252)
+            - hint: all_d belts=1 (13.4252)
+            - hint: all_d mixers=1 (17.905)
+            - hint: up belts=1 (7.15802)
+            - hint: up belts=1, mixer=1 (7.15802)
+            - hint: up belts=1, mixer=1, underground=1 (7.15802)
+    - 6x6 top 4 rows hidden
+        - feasible
+            - without (3787.97)
+            - hint: belts=1 (1475.37) -- 
+            - hint: mixers=1 (767.999) -- best for some reason
+            - hint: belts=1, mixers=1, underground=1 (1475.37) -- 
+            - hint: belts=1, mixers=0, underground=0 (1475.37) -- 
+            - hint: belts=0, mixers=1, underground=0 (767.999) -- 
+
 
 
 ## Notable solutions

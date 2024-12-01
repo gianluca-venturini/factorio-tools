@@ -195,9 +195,9 @@ class TestFactorioBalancer(unittest.TestCase):
         # One belt that goes down
         self.assertEqual(result,
             '↿↾\n' +
-            '↥‧\n' +
-            '‧‧\n' +
-            '△‧\n'
+            '▲‧\n' +
+            '▲‧\n' +
+            '▲‧\n'
         )
 
 if __name__ == '__main__':

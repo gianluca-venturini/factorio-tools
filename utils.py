@@ -448,7 +448,13 @@ def encode_components_blueprint_json(solver, b, m, u, grid_size):
 
     return blueprint_string
 
-def load_solution(solver, variables, solution, grid_size):
+def load_solution(solver, variables, solution, grid_size, is_hint=False):
+    def add_solution(variable, value):
+        if is_hint:
+            solver.AddHint(variable, value)
+        else:
+            solver.Add(variable == value)
+
     normalize_solution = solution.replace('\n', '')
     if len(normalize_solution) != grid_size[0] * grid_size[1]:
         raise Exception(f'Invalid solution size: {len(normalize_solution)} != {grid_size[0] * grid_size[1]}')
@@ -463,14 +469,14 @@ def load_solution(solver, variables, solution, grid_size):
                 continue
             if char in BELT_SYMBOL.values():
                 d = next(key for key, value in BELT_SYMBOL.items() if value == char)
-                solver.Add(b[i][j][DIRECTIONS.index(d)] == 1)
+                add_solution(b[i][j][DIRECTIONS.index(d)], 1)
             elif char in MIXER_SYMBOL.values():
                 d = next(key for key, value in MIXER_SYMBOL.items() if value[0] == char)
-                solver.Add(m[i][j][DIRECTIONS.index(d)] == 1)
+                add_solution(m[i][j][DIRECTIONS.index(d)], 1)
             elif char in UNDERGROUND_BELT_SYMBOL.values():
                 d = next(key for key, value in UNDERGROUND_BELT_SYMBOL.items() if value[0] == char or value[1] == char)
                 if char == UNDERGROUND_BELT_SYMBOL[d][0]:
-                    solver.Add(ua[i][j][DIRECTIONS.index(d)] == 1)
+                    add_solution(ua[i][j][DIRECTIONS.index(d)], 1)
                 elif char == UNDERGROUND_BELT_SYMBOL[d][1]:
-                    solver.Add(ub[i][j][DIRECTIONS.index(d)] == 1)
+                    add_solution(ub[i][j][DIRECTIONS.index(d)], 1)
 
