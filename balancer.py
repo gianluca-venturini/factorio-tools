@@ -261,20 +261,20 @@ def solve_factorio_belt_balancer(
                                 # cell 2
                                 solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
 
-                        if s in inputs:
-                            # Input flow is gte zero
-                            solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
-                            solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
-                        elif s in outputs:
-                            # Output flow is lte zero
-                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
-                            solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
-                        else:
-                            # All other sources are zero
-                            solver.Add(f[i][j][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-                            solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-                            solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                            if s in inputs:
+                                # Input sources flow is gte zero
+                                solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
+                                solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
+                            elif s in outputs:
+                                # Output sources flow is lte zero
+                                solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
+                                solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
+                            else:
+                                # All other sources are zero
+                                solver.Add(f[i][j][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                                solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                                solver.Add(f[i][j][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                                solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
 
     ##
     ## Underground belt constraints
