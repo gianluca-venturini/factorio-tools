@@ -346,7 +346,7 @@ def visitor_components(solver, variables, grid_size, render_new_line, render_emp
             for d in range(len(DIRECTIONS)):
                 if found:
                     break
-                if solver.Value(m[i][j][d]) > 0:
+                if any([solver.Value(m[i][j][d][n]) > 0 for n in range(len(m[i][j][d]))]):
                     render_m(i, j, DIRECTIONS[d], 0)
                     found = True
             # Visualize the mixer second cell
@@ -354,7 +354,7 @@ def visitor_components(solver, variables, grid_size, render_new_line, render_emp
                 if found:
                     break
                 ci, cj = mixer_first_cell(i, j, DIRECTIONS[d])
-                if inside_grid(ci, cj, grid_size) and solver.Value(m[ci][cj][d]) > 0:
+                if inside_grid(ci, cj, grid_size) and any([solver.Value(m[ci][cj][d][n]) > 0 for n in range(len(m[ci][cj][d]))]):
                     render_m(i, j, DIRECTIONS[d], 1)
                     found = True
             # Visualize the underground belt
