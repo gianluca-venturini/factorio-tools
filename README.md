@@ -135,3 +135,5 @@ solve_factorio_belt_balancer((5, 6), 2, [
 - with feasible solution fixing two rows and 2 cells and hint to uf=0 finds solution in 17s (7.85157)
     - hint belts -- worse
     - hint mixers
+
+- with pre-computed graph feasible solution no fixed rows in 70s
