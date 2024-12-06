@@ -230,12 +230,8 @@ def solve_factorio_belt_balancer(
         solver.Add(sum(m[i][j][d][n] for d in range(len(DIRECTIONS)) for j in range(H) for i in range(W)) == 1)
 
     # Source flow constraints on every mixer
-    # TODO: double check that this constraint works
     for n in range(num_mixers):
-        print(f'mixer {n}')
         inputs, outputs = network_solution[n]
-        print(f'inputs {inputs}')
-        print(f'outputs {outputs}')
         for i in range(W):
             for j in range(H):
                 for d in range(len(DIRECTIONS)):
@@ -263,7 +259,6 @@ def solve_factorio_belt_balancer(
                                 solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
 
                             if s in inputs:
-                                print(f'input {s}')
                                 # Input sources flow is gte zero
                                 solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
                                 solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
@@ -274,7 +269,6 @@ def solve_factorio_belt_balancer(
                                 solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
 
                             if s in outputs:
-                                print(f'output {s}')
                                 # Output sources flow is lte zero
                                 solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
                                 solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
@@ -501,49 +495,39 @@ if __name__ == '__main__':
     #     (3, 5, 'N', 2, -8),
     # ], 24)
 
-    # Balancer 3 x 3 - with network solutions
-    solve_factorio_belt_balancer((5, 6), 4, [
-        (0, 0, 'S', 0, 1),
-        (1, 0, 'S', 0, 1),
-        (2, 0, 'S', 0, 1),
+    # # Balancer 3 x 3 - with network solutions
+    # solve_factorio_belt_balancer((5, 6), 4, [
+    #     (0, 0, 'S', 0, 1),
+    #     (1, 0, 'S', 0, 1),
+    #     (2, 0, 'S', 0, 1),
 
-        (1, 5, 'N', 3, -1),
-        (2, 5, 'N', 3, -1),
-        (3, 5, 'N', 3, -1),
-    ], 1, network_solution=(
-        ((0, 0), (1, 1)),
-        ((0, 3), (2, 2)),
-        ((1, 2), (3, 3)),
-        ((1, 2), (3, 3))
-    ))
+    #     (1, 5, 'N', 3, -1),
+    #     (2, 5, 'N', 3, -1),
+    #     (3, 5, 'N', 3, -1),
+    # ], 1, network_solution=(
+    #     ((0, 0), (1, 1)),
+    #     ((0, 3), (2, 2)),
+    #     ((1, 2), (3, 3)),
+    #     ((1, 2), (3, 3))
+    # ))
 
-    # Balancer 4 x 4
+    # # Balancer 4 x 4
     # solve_factorio_belt_balancer((4, 7), 4, [
-    #     (0, 0, 'S', 0, 16),
-    #     (1, 0, 'S', 1, 16),
-    #     (2, 0, 'S', 2, 16),
-    #     (3, 0, 'S', 3, 16),
+    #     (0, 0, 'S', 0, 1),
+    #     (1, 0, 'S', 0, 1),
+    #     (2, 0, 'S', 0, 1),
+    #     (3, 0, 'S', 0, 1),
 
-    #     (0, 6, 'N', 0, -4),
-    #     (0, 6, 'N', 1, -4),
-    #     (0, 6, 'N', 2, -4),
-    #     (0, 6, 'N', 3, -4),
-
-    #     (1, 6, 'N', 0, -4),
-    #     (1, 6, 'N', 1, -4),
-    #     (1, 6, 'N', 2, -4),
-    #     (1, 6, 'N', 3, -4),
-
-    #     (2, 6, 'N', 0, -4),
-    #     (2, 6, 'N', 1, -4),
-    #     (2, 6, 'N', 2, -4),
-    #     (2, 6, 'N', 3, -4),
-
-    #     (3, 6, 'N', 0, -4),
-    #     (3, 6, 'N', 1, -4),
-    #     (3, 6, 'N', 2, -4),
-    #     (3, 6, 'N', 3, -4),
-    # ], 16)
+    #     (0, 6, 'N', 3, -1),
+    #     (1, 6, 'N', 3, -1),
+    #     (2, 6, 'N', 3, -1),
+    #     (3, 6, 'N', 3, -1),
+    # ], 1, network_solution=(
+    #     ((0, 0), (1, 1)),
+    #     ((0, 0), (2, 2)),
+    #     ((1, 2), (3, 3)),
+    #     ((1, 2), (3, 3)),
+    # ))
 
     # Balancer 4 x 4 with solution
     # solve_factorio_belt_balancer((4, 7), 4, [
@@ -832,6 +816,40 @@ if __name__ == '__main__':
     #     deterministic_time=True,
     #     feasible_ok=True,
     # )
+
+    # Balancer 8 x 8
+    solve_factorio_belt_balancer((8, 10), 10, [
+        (0, 0, 'S', 0, 1),
+        (1, 0, 'S', 0, 1),
+        (2, 0, 'S', 0, 1),
+        (3, 0, 'S', 0, 1),
+        (4, 0, 'S', 0, 1),
+        (5, 0, 'S', 0, 1),
+        (6, 0, 'S', 0, 1),
+        (7, 0, 'S', 0, 1),
+
+        (0, 9, 'N', 9, -1),
+        (1, 9, 'N', 9, -1),
+        (2, 9, 'N', 9, -1),
+        (3, 9, 'N', 9, -1),
+        (4, 9, 'N', 9, -1),
+        (5, 9, 'N', 9, -1),
+        (6, 9, 'N', 9, -1),
+        (7, 9, 'N', 9, -1),
+    ], 1, network_solution=(
+        ((0, 0), (1, 1)),
+        ((0, 0), (2, 2)),
+        ((0, 0), (3, 3)),
+        ((0, 0), (4, 4)),
+        ((1, 2), (5, 5)),
+        ((1, 2), (6, 6)),
+        ((3, 4), (7, 7)),
+        ((3, 4), (8, 8)),
+        ((5, 6), (9, 9)),
+        ((5, 6), (9, 9)),
+        ((7, 8), (9, 9)),
+        ((7, 8), (9, 9)),
+    ))
 
     # # Balancer 16 x 16
     # solve_factorio_belt_balancer((16, 16), 16, [
