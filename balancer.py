@@ -46,7 +46,7 @@ def solve_factorio_belt_balancer(
     # Grid size
     W, H = grid_size
 
-    num_mixers = len(network_solution)
+    num_mixers = len(network_solution) if network_solution is not None else 1
 
     # Create the CP-SAT solver
     solver = cp_model.CpModel()
@@ -215,87 +215,89 @@ def solve_factorio_belt_balancer(
                     if not mixer_can_be_placed(i, j, DIRECTIONS[d], grid_size):
                         solver.Add(m[i][j][d][n] == 0)
 
-    # # 9. Flow through mixer
-    # for i in range(W):
-    #     for j in range(H):
-    #         for s in range(num_sources):
-    #             for d in range(len(DIRECTIONS)):
-    #                 ci, cj = mixer_second_cell(i, j, DIRECTIONS[d])
-    #                 if inside_grid(ci, cj, grid_size):
-    #                     # Input and output flows sum to zero
-    #                     solver.Add(
-    #                         f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] + 
-    #                         f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] == 
-    #                         0
-    #                     ).only_enforce_if(m[i][j][d])
-    #                     # Output flow is evenly distributed in the two cell outputs: the two outputs are identical
-    #                     solver.Add(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d])
-    #                     # Input flows are gte zero
-    #                     solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d])
-    #                     solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d])
-    #                     # Output flows are lte zero
-    #                     solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d])
-    #                     solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d])
-    #                     # Zero flow from all the other directions that are not input or output
-    #                     directions = mixer_zero_directions(DIRECTIONS[d])
-    #                     for dir in directions:
-    #                         # cell 1
-    #                         solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d])
-    #                         # cell 2
-    #                         solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d])
-
-    # Only one mixer of any type can be placed
-    for n in range(num_mixers):
-        solver.Add(sum(m[i][j][d][n] for d in range(len(DIRECTIONS)) for j in range(H) for i in range(W)) == 1)
 
     # Source flow constraints on every mixer
-    for n in range(num_mixers):
-        inputs, outputs = network_solution[n]
+    if network_solution is not None:
+        # Only one mixer of any type can be placed
+        for n in range(num_mixers):
+            solver.Add(sum(m[i][j][d][n] for d in range(len(DIRECTIONS)) for j in range(H) for i in range(W)) == 1)
+
+        for n in range(num_mixers):
+            inputs, outputs = network_solution[n]
+            for i in range(W):
+                for j in range(H):
+                    for d in range(len(DIRECTIONS)):
+                        ci, cj = mixer_second_cell(i, j, DIRECTIONS[d])
+                        if inside_grid(ci, cj, grid_size):
+                            # Input flow and output flows are the same
+                            solver.Add(
+                                sum(
+                                    (
+                                        f[i][j][s][mixer_input_direction_idx(d)] +
+                                        f[ci][cj][s][mixer_input_direction_idx(d)] + 
+                                        f[i][j][s][mixer_output_direction_idx(d)] + 
+                                        f[ci][cj][s][mixer_output_direction_idx(d)]
+                                    )
+                                    for s in range(num_sources)
+                                ) == 
+                                0
+                            ).only_enforce_if(m[i][j][d][n])
+                            # Output flow is evenly distributed in the two cell outputs: the two outputs are identical
+                            solver.Add(sum(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] for s in range(num_sources)) == 0).only_enforce_if(m[i][j][d][n])
+                            zero_directions = mixer_zero_directions(DIRECTIONS[d])
+                            for s in range(num_sources):
+                                for dir in zero_directions:
+                                    solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
+
+                                if s in inputs:
+                                    # Input sources flow is gte zero
+                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
+                                    # Force the source to enter from one of the two cells
+                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] > 0).only_enforce_if(m[i][j][d][n])
+                                else:
+                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+
+                                if s in outputs:
+                                    # Output sources flow is lte zero
+                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
+                                    # Force the source to exit from one of the two cells
+                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] < 0).only_enforce_if(m[i][j][d][n])
+                                else:
+                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+    else:
+        # Regular flow through mixer
         for i in range(W):
             for j in range(H):
-                for d in range(len(DIRECTIONS)):
-                    ci, cj = mixer_second_cell(i, j, DIRECTIONS[d])
-                    if inside_grid(ci, cj, grid_size):
-                        # Input flow and output flows are the same
-                        solver.Add(
-                            sum(
-                                (
-                                    f[i][j][s][mixer_input_direction_idx(d)] +
-                                    f[ci][cj][s][mixer_input_direction_idx(d)] + 
-                                    f[i][j][s][mixer_output_direction_idx(d)] + 
-                                    f[ci][cj][s][mixer_output_direction_idx(d)]
-                                )
-                                for s in range(num_sources)
-                            ) == 
-                            0
-                        ).only_enforce_if(m[i][j][d][n])
-                        # Output flow is evenly distributed in the two cell outputs: the two outputs are identical
-                        solver.Add(sum(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] for s in range(num_sources)) == 0).only_enforce_if(m[i][j][d][n])
-                        zero_directions = mixer_zero_directions(DIRECTIONS[d])
-                        for s in range(num_sources):
-                            for dir in zero_directions:
-                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
-                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
-
-                            if s in inputs:
-                                # Input sources flow is gte zero
-                                solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
-                                solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
-                                # Force the source to enter from one of the two cells
-                                solver.Add(f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] > 0).only_enforce_if(m[i][j][d][n])
-                            else:
-                                solver.Add(f[i][j][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-                                solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-
-                            if s in outputs:
-                                # Output sources flow is lte zero
-                                solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
-                                solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
-                                # Force the source to exit from one of the two cells
-                                solver.Add(f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] < 0).only_enforce_if(m[i][j][d][n])
-                            else:
-                                solver.Add(f[i][j][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-                                solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                for s in range(num_sources):
+                    for d in range(len(DIRECTIONS)):
+                        ci, cj = mixer_second_cell(i, j, DIRECTIONS[d])
+                        if inside_grid(ci, cj, grid_size):
+                            # Input and output flows sum to zero
+                            solver.Add(
+                                f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] + 
+                                f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] == 
+                                0
+                            ).only_enforce_if(m[i][j][d])
+                            # Output flow is evenly distributed in the two cell outputs: the two outputs are identical
+                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][0])
+                            # Input flows are gte zero
+                            solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][0])
+                            solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][0])
+                            # Output flows are lte zero
+                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][0])
+                            solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][0])
+                            # Zero flow from all the other directions that are not input or output
+                            directions = mixer_zero_directions(DIRECTIONS[d])
+                            for dir in directions:
+                                # cell 1
+                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][0])
+                                # cell 2
+                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][0])
 
     ##
     ## Underground belt constraints
@@ -391,10 +393,10 @@ def solve_factorio_belt_balancer(
 
     if hint_solutions is not None:
         for hint_solution in hint_solutions:
-            load_solution(solver, variables, hint_solution, grid_size, is_hint=True)
+            load_solution(solver, variables, hint_solution, grid_size, num_mixers, is_hint=True)
 
     if solution is not None:
-        load_solution(solver, variables, solution, grid_size)
+        load_solution(solver, variables, solution, grid_size, num_mixers)
 
     if not feasible_ok:
         objective1 = sum(
@@ -449,141 +451,449 @@ def solve_factorio_belt_balancer(
     else:
         raise Exception(f'Unexpected solver status: {status}.')
 
-# if main
-if __name__ == '__main__':
 
-    # Single belt balancer
-    # solve_factorio_belt_balancer((3, 3), 1, [
-    #     (0, 2, 'N', 0, -1),
-    #     (0, 0, 'S', 0, 1),
-    # ], 1, disable_underground=True)
+BALANCERS = {
+    '1_b': lambda:
+        solve_factorio_belt_balancer((3, 3), 1, [
+            (0, 2, 'N', 0, -1),
+            (0, 0, 'S', 0, 1),
+        ], 1, disable_underground=True),
+    # 1 belt with solution
+    '1_b_s': lambda:
+        solve_factorio_belt_balancer((3, 3), 1, [
+            (0, 2, 'N', 0, -1),
+            (0, 0, 'S', 0, 1),
+        ], 1, solution=
+            '▲‧‧\n' +
+            '▲‧‧\n' +
+            '▲‧‧\n'
+        ),
+    # 1 mixer with
+    '1_m': lambda:
+        solve_factorio_belt_balancer((2, 1), 2, [
+            (0, 0, 'S', 0, 2),
+            (1, 0, 'S', 1, 2),
+            (0, 0, 'N', 0, -1),
+            (0, 0, 'N', 1, -1),
+            (1, 0, 'N', 0, -1),
+            (1, 0, 'N', 1, -1),
+        ], 2),
+    # 1 mixer with network solution
+    '1_m_n': lambda:
+        solve_factorio_belt_balancer((2, 1), 2, [
+            (0, 0, 'S', 0, 2),
+            (1, 0, 'S', 0, 2),
+            (0, 0, 'N', 1, -2),
+            (1, 0, 'N', 1, -2),
+        ], 2, network_solution=(
+            ((0, 0), (1, 1)),
+        )),
+    # Swap two belts
+    's_2': lambda:
+        solve_factorio_belt_balancer((5, 6), 2, [
+            (2, 0, 'S', 0, 1),
+            (3, 0, 'S', 1, 1),
+            (3, 5, 'N', 0, -1),
+            (2, 5, 'N', 1, -1),
+        ], 1),
+    '2x2': lambda:
+        solve_factorio_belt_balancer((2, 3), 2, [
+            (0, 0, 'S', 0, 2),
+            (1, 0, 'S', 1, 2),
+            (0, 2, 'N', 0, -1),
+            (0, 2, 'N', 1, -1),
+            (1, 2, 'N', 0, -1),
+            (1, 2, 'N', 1, -1),
+        ], 2),
+    '3x3': lambda:
+        solve_factorio_belt_balancer((5, 6), 3, [
+            (0, 0, 'S', 0, 24),
+            (1, 0, 'S', 1, 24),
+            (2, 0, 'S', 2, 24),
 
-    # Mixer 2 x 1
-    # solve_factorio_belt_balancer((2, 1), 2, [
-    #     (0, 0, 'S', 0, 2),
-    #     (1, 0, 'S', 1, 2),
-    #     (0, 0, 'N', 0, -1),
-    #     (0, 0, 'N', 1, -1),
-    #     (1, 0, 'N', 0, -1),
-    #     (1, 0, 'N', 1, -1),
-    # ], 2)
+            (1, 5, 'N', 0, -8),
+            (1, 5, 'N', 1, -8),
+            (1, 5, 'N', 2, -8),
 
-    # # Mixer 2 x 1
-    # solve_factorio_belt_balancer((2, 1), 2, [
-    #     (0, 0, 'S', 0, 2),
-    #     (1, 0, 'S', 0, 2),
-    #     (0, 0, 'N', 1, -2),
-    #     (1, 0, 'N', 1, -2),
-    # ], 2, network_solution=(
-    #     ((0, 0), (1, 1)),
-    # ))
+            (2, 5, 'N', 0, -8),
+            (2, 5, 'N', 1, -8),
+            (2, 5, 'N', 2, -8),
 
-    # # Single mixer balancer
-    # solve_factorio_belt_balancer((2, 3), 2, [
-    #     (0, 0, 'S', 0, 2),
-    #     (1, 0, 'S', 1, 2),
-    #     (0, 2, 'N', 0, -1),
-    #     (0, 2, 'N', 1, -1),
-    #     (1, 2, 'N', 0, -1),
-    #     (1, 2, 'N', 1, -1),
-    # ], 2)
-
-    # Undergroun 2 belts
-    # solve_factorio_belt_balancer((5, 6), 2, [
-    #     (2, 0, 'S', 0, 1),
-    #     (3, 0, 'S', 1, 1),
-    #     (3, 5, 'N', 0, -1),
-    #     (2, 5, 'N', 1, -1),
-    # ], 1)
-
-    # # Balancer 3 x 3
-    # solve_factorio_belt_balancer((5, 6), 3, [
-    #     (0, 0, 'S', 0, 24),
-    #     (1, 0, 'S', 1, 24),
-    #     (2, 0, 'S', 2, 24),
-
-    #     (1, 5, 'N', 0, -8),
-    #     (1, 5, 'N', 1, -8),
-    #     (1, 5, 'N', 2, -8),
-
-    #     (2, 5, 'N', 0, -8),
-    #     (2, 5, 'N', 1, -8),
-    #     (2, 5, 'N', 2, -8),
-
-    #     (3, 5, 'N', 0, -8),
-    #     (3, 5, 'N', 1, -8),
-    #     (3, 5, 'N', 2, -8),
-    # ], 24)
-
+            (3, 5, 'N', 0, -8),
+            (3, 5, 'N', 1, -8),
+            (3, 5, 'N', 2, -8),
+        ], 24),
     # Balancer 3 x 3 - with network solutions
-    solve_factorio_belt_balancer((5, 6), 4, [
-        (0, 0, 'S', 0, 1),
-        (1, 0, 'S', 0, 1),
-        (2, 0, 'S', 0, 1),
+    '3x3_n': lambda:
+        solve_factorio_belt_balancer((5, 6), 4, [
+            (0, 0, 'S', 0, 1),
+            (1, 0, 'S', 0, 1),
+            (2, 0, 'S', 0, 1),
 
-        (1, 5, 'N', 3, -1),
-        (2, 5, 'N', 3, -1),
-        (3, 5, 'N', 3, -1),
-    ], 1, network_solution=(
-        ((0, 0), (1, 1)),
-        ((0, 3), (2, 2)),
-        ((1, 2), (3, 3)),
-        ((1, 2), (3, 3))
-    ))
+            (1, 5, 'N', 3, -1),
+            (2, 5, 'N', 3, -1),
+            (3, 5, 'N', 3, -1),
+        ], 1, network_solution=(
+            ((0, 0), (1, 1)),
+            ((0, 3), (2, 2)),
+            ((1, 2), (3, 3)),
+            ((1, 2), (3, 3))
+        )),
+    '4x4': lambda:
+        solve_factorio_belt_balancer((4, 7), 4, [
+            (0, 0, 'S', 0, 16),
+            (1, 0, 'S', 1, 16),
+            (2, 0, 'S', 2, 16),
+            (3, 0, 'S', 3, 16),
 
-    # # Balancer 4 x 4
-    # solve_factorio_belt_balancer((4, 7), 4, [
-    #     (0, 0, 'S', 0, 1),
-    #     (1, 0, 'S', 0, 1),
-    #     (2, 0, 'S', 0, 1),
-    #     (3, 0, 'S', 0, 1),
+            (0, 6, 'N', 0, -4),
+            (0, 6, 'N', 1, -4),
+            (0, 6, 'N', 2, -4),
+            (0, 6, 'N', 3, -4),
 
-    #     (0, 6, 'N', 3, -1),
-    #     (1, 6, 'N', 3, -1),
-    #     (2, 6, 'N', 3, -1),
-    #     (3, 6, 'N', 3, -1),
-    # ], 1, network_solution=(
-    #     ((0, 0), (1, 1)),
-    #     ((0, 0), (2, 2)),
-    #     ((1, 2), (3, 3)),
-    #     ((1, 2), (3, 3)),
-    # ))
+            (1, 6, 'N', 0, -4),
+            (1, 6, 'N', 1, -4),
+            (1, 6, 'N', 2, -4),
+            (1, 6, 'N', 3, -4),
 
-    # Balancer 4 x 4 with solution
-    # solve_factorio_belt_balancer((4, 7), 4, [
-    #     (0, 0, 'S', 0, 16),
-    #     (1, 0, 'S', 1, 16),
-    #     (2, 0, 'S', 2, 16),
-    #     (3, 0, 'S', 3, 16),
+            (2, 6, 'N', 0, -4),
+            (2, 6, 'N', 1, -4),
+            (2, 6, 'N', 2, -4),
+            (2, 6, 'N', 3, -4),
 
-    #     (0, 6, 'N', 0, -4),
-    #     (0, 6, 'N', 1, -4),
-    #     (0, 6, 'N', 2, -4),
-    #     (0, 6, 'N', 3, -4),
+            (3, 6, 'N', 0, -4),
+            (3, 6, 'N', 1, -4),
+            (3, 6, 'N', 2, -4),
+            (3, 6, 'N', 3, -4),
+        ], 16),
+    # Balancer 4 x 4 - with precomputed solution
+    '4x4_s': lambda:
+        solve_factorio_belt_balancer((4, 7), 4, [
+            (0, 0, 'S', 0, 16),
+            (1, 0, 'S', 1, 16),
+            (2, 0, 'S', 2, 16),
+            (3, 0, 'S', 3, 16),
 
-    #     (1, 6, 'N', 0, -4),
-    #     (1, 6, 'N', 1, -4),
-    #     (1, 6, 'N', 2, -4),
-    #     (1, 6, 'N', 3, -4),
+            (0, 6, 'N', 0, -4),
+            (0, 6, 'N', 1, -4),
+            (0, 6, 'N', 2, -4),
+            (0, 6, 'N', 3, -4),
 
-    #     (2, 6, 'N', 0, -4),
-    #     (2, 6, 'N', 1, -4),
-    #     (2, 6, 'N', 2, -4),
-    #     (2, 6, 'N', 3, -4),
+            (1, 6, 'N', 0, -4),
+            (1, 6, 'N', 1, -4),
+            (1, 6, 'N', 2, -4),
+            (1, 6, 'N', 3, -4),
 
-    #     (3, 6, 'N', 0, -4),
-    #     (3, 6, 'N', 1, -4),
-    #     (3, 6, 'N', 2, -4),
-    #     (3, 6, 'N', 3, -4),
-    # ], 16, solution=
-    #     '↥↿↾↥\n' +
-    #     '‧↥↥△\n' +
-    #     '△▶▶▲\n' +
-    #     '↿↾‧‧\n' +
-    #     '↥▲◀◀\n' +
-    #     '△△△▲\n' +
-    #     '↿↾↿↾\n'
-    # )
+            (2, 6, 'N', 0, -4),
+            (2, 6, 'N', 1, -4),
+            (2, 6, 'N', 2, -4),
+            (2, 6, 'N', 3, -4),
+
+            (3, 6, 'N', 0, -4),
+            (3, 6, 'N', 1, -4),
+            (3, 6, 'N', 2, -4),
+            (3, 6, 'N', 3, -4),
+        ], 16, solution=
+            '↥↿↾↥\n' +
+            '‧↥↥△\n' +
+            '△▶▶▲\n' +
+            '↿↾‧‧\n' +
+            '↥▲◀◀\n' +
+            '△△△▲\n' +
+            '↿↾↿↾\n'
+        ),
+    '4x4_n': lambda:
+        solve_factorio_belt_balancer((4, 7), 4, [
+            (0, 0, 'S', 0, 1),
+            (1, 0, 'S', 0, 1),
+            (2, 0, 'S', 0, 1),
+            (3, 0, 'S', 0, 1),
+
+            (0, 6, 'N', 3, -1),
+            (1, 6, 'N', 3, -1),
+            (2, 6, 'N', 3, -1),
+            (3, 6, 'N', 3, -1),
+        ], 1, network_solution=(
+            ((0, 0), (1, 1)),
+            ((0, 0), (2, 2)),
+            ((1, 2), (3, 3)),
+            ((1, 2), (3, 3)),
+        )),
+    # Balancer 8 x 8 - with precomputed partial solution
+    '8x8_ps': lambda:
+        solve_factorio_belt_balancer((8, 10), 8, [
+            (0, 0, 'S', 0, 8),
+            (1, 0, 'S', 1, 8),
+            (2, 0, 'S', 2, 8),
+            (3, 0, 'S', 3, 8),
+            (4, 0, 'S', 4, 8),
+            (5, 0, 'S', 5, 8),
+            (6, 0, 'S', 6, 8),
+            (7, 0, 'S', 7, 8),
+
+            (0, 9, 'N', 0, -1),
+            (0, 9, 'N', 1, -1),
+            (0, 9, 'N', 2, -1),
+            (0, 9, 'N', 3, -1),
+            (0, 9, 'N', 4, -1),
+            (0, 9, 'N', 5, -1),
+            (0, 9, 'N', 6, -1),
+            (0, 9, 'N', 7, -1),
+
+            (1, 9, 'N', 0, -1),
+            (1, 9, 'N', 1, -1),
+            (1, 9, 'N', 2, -1),
+            (1, 9, 'N', 3, -1),
+            (1, 9, 'N', 4, -1),
+            (1, 9, 'N', 5, -1),
+            (1, 9, 'N', 6, -1),
+            (1, 9, 'N', 7, -1),
+
+            (2, 9, 'N', 0, -1),
+            (2, 9, 'N', 1, -1),
+            (2, 9, 'N', 2, -1),
+            (2, 9, 'N', 3, -1),
+            (2, 9, 'N', 4, -1),
+            (2, 9, 'N', 5, -1),
+            (2, 9, 'N', 6, -1),
+            (2, 9, 'N', 7, -1),
+
+            (3, 9, 'N', 0, -1),
+            (3, 9, 'N', 1, -1),
+            (3, 9, 'N', 2, -1),
+            (3, 9, 'N', 3, -1),
+            (3, 9, 'N', 4, -1),
+            (3, 9, 'N', 5, -1),
+            (3, 9, 'N', 6, -1),
+            (3, 9, 'N', 7, -1),
+
+            (4, 9, 'N', 0, -1),
+            (4, 9, 'N', 1, -1),
+            (4, 9, 'N', 2, -1),
+            (4, 9, 'N', 3, -1),
+            (4, 9, 'N', 4, -1),
+            (4, 9, 'N', 5, -1),
+            (4, 9, 'N', 6, -1),
+            (4, 9, 'N', 7, -1),
+
+            (5, 9, 'N', 0, -1),
+            (5, 9, 'N', 1, -1),
+            (5, 9, 'N', 2, -1),
+            (5, 9, 'N', 3, -1),
+            (5, 9, 'N', 4, -1),
+            (5, 9, 'N', 5, -1),
+            (5, 9, 'N', 6, -1),
+            (5, 9, 'N', 7, -1),
+
+            (6, 9, 'N', 0, -1),
+            (6, 9, 'N', 1, -1),
+            (6, 9, 'N', 2, -1),
+            (6, 9, 'N', 3, -1),
+            (6, 9, 'N', 4, -1),
+            (6, 9, 'N', 5, -1),
+            (6, 9, 'N', 6, -1),
+            (6, 9, 'N', 7, -1),
+
+            (7, 9, 'N', 0, -1),
+            (7, 9, 'N', 1, -1),
+            (7, 9, 'N', 2, -1),
+            (7, 9, 'N', 3, -1),
+            (7, 9, 'N', 4, -1),
+            (7, 9, 'N', 5, -1),
+            (7, 9, 'N', 6, -1),
+            (7, 9, 'N', 7, -1),
+        ], 8,
+            # solution=
+            #     '↿↾↿↾↿↾↿↾' +
+            #     '↥↥↥▲↥↥↥▲' +
+            #     '‧▶▷▲◀◀↦▲' +
+            #     '△▲◀‧△▲◀◀' +
+            #     '▲↤▲▶▲◁◀▲' +
+            #     '‧‧↿↾‧‧↿↾' +
+            #     '▶▶▲↥▶▶▲↥' +
+            #     '↥△△‧↥△△‧' +
+            #     '△↿↾△△↿↾△' +
+            #     '↿↾↿↾↿↾↿↾',
+            solution=
+                '↿↾↿↾↿↾↿↾' +
+                '‧‧‧‧‧‧‧▲' +
+                '‧‧‧‧‧‧‧‧' +
+                '‧‧‧‧‧‧‧‧' +
+                '‧‧‧‧‧‧‧‧' +
+                '‧‧‧‧‧‧‧‧' +
+                '‧‧‧‧‧‧‧‧' +
+                '‧‧‧‧‧‧‧‧' +
+                '‧‧‧‧‧‧‧△' +
+                '↿↾↿↾↿↾↿↾',
+            deterministic_time=True,
+            feasible_ok=True,
+        ),
+        '16x16_n': lambda:
+            solve_factorio_belt_balancer((16, 14), 16, [
+            # Inputs
+            (0, 0, 'S', 0, 1),
+            (1, 0, 'S', 0, 1),
+            (2, 0, 'S', 0, 1),
+            (3, 0, 'S', 0, 1),
+            (4, 0, 'S', 0, 1),
+            (5, 0, 'S', 0, 1),
+            (6, 0, 'S', 0, 1),
+            (7, 0, 'S', 0, 1),
+            (8, 0, 'S', 0, 1),
+            (9, 0, 'S', 0, 1),
+            (10, 0, 'S', 0, 1),
+            (11, 0, 'S', 0, 1),
+            (12, 0, 'S', 0, 1),
+            (13, 0, 'S', 0, 1),
+            (14, 0, 'S', 0, 1),
+            (15, 0, 'S', 0, 1),
+
+            # Outputs
+            (0, 13, 'N', 15, -1),
+            (1, 13, 'N', 15, -1),
+            (2, 13, 'N', 15, -1),
+            (3, 13, 'N', 15, -1),
+            (4, 13, 'N', 15, -1),
+            (5, 13, 'N', 15, -1),
+            (6, 13, 'N', 15, -1),
+            (7, 13, 'N', 15, -1),
+            (8, 13, 'N', 15, -1),
+            (9, 13, 'N', 15, -1),
+            (10, 13, 'N', 15, -1),
+            (11, 13, 'N', 15, -1),
+            (12, 13, 'N', 15, -1),
+            (13, 13, 'N', 15, -1),
+            (14, 13, 'N', 15, -1),
+            (15, 13, 'N', 15, -1),
+        ], 1,
+            network_solution=(
+                ((0, 0), (1, 1)),
+                ((0, 0), (2, 2)),
+                ((0, 0), (3, 3)),
+                ((0, 0), (4, 4)),
+                ((0, 0), (5, 5)),
+                ((0, 0), (6, 6)),
+                ((0, 0), (7, 7)),
+                ((0, 0), (8, 8)),
+                ((1, 2), (9, 9)),
+                ((1, 2), (9, 9)),
+                ((3, 4), (10, 10)),
+                ((3, 4), (10, 10)),
+                ((5, 6), (11, 11)),
+                ((5, 6), (11, 11)),
+                ((7, 8), (12, 12)),
+                ((7, 8), (12, 12)),
+                ((9, 10), (13, 13)),
+                ((9, 10), (13, 13)),
+                ((9, 10), (13, 13)),
+                ((9, 10), (13, 13)),
+                ((11, 12), (14, 14)),
+                ((11, 12), (14, 14)),
+                ((11, 12), (14, 14)),
+                ((11, 12), (14, 14)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+            ),
+            feasible_ok=True,
+        ),
+        '16x16_n_s': lambda:
+            solve_factorio_belt_balancer((16, 16), 16, [
+            # Inputs
+            (0, 0, 'S', 0, 1),
+            (1, 0, 'S', 0, 1),
+            (2, 0, 'S', 0, 1),
+            (3, 0, 'S', 0, 1),
+            (4, 0, 'S', 0, 1),
+            (5, 0, 'S', 0, 1),
+            (6, 0, 'S', 0, 1),
+            (7, 0, 'S', 0, 1),
+            (8, 0, 'S', 0, 1),
+            (9, 0, 'S', 0, 1),
+            (10, 0, 'S', 0, 1),
+            (11, 0, 'S', 0, 1),
+            (12, 0, 'S', 0, 1),
+            (13, 0, 'S', 0, 1),
+            (14, 0, 'S', 0, 1),
+            (15, 0, 'S', 0, 1),
+
+            # Outputs
+            (0, 15, 'N', 15, -1),
+            (1, 15, 'N', 15, -1),
+            (2, 15, 'N', 15, -1),
+            (3, 15, 'N', 15, -1),
+            (4, 15, 'N', 15, -1),
+            (5, 15, 'N', 15, -1),
+            (6, 15, 'N', 15, -1),
+            (7, 15, 'N', 15, -1),
+            (8, 15, 'N', 15, -1),
+            (9, 15, 'N', 15, -1),
+            (10, 15, 'N', 15, -1),
+            (11, 15, 'N', 15, -1),
+            (12, 15, 'N', 15, -1),
+            (13, 15, 'N', 15, -1),
+            (14, 15, 'N', 15, -1),
+            (15, 15, 'N', 15, -1),
+        ], 1,
+            solution=
+                '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾' +
+                '▲▲▲▲▲▲▲▲▲▲▲↥↥▲▲▲' +
+                '▲▲▲↥↥▲↥↥↥▲▲◀◀▲↥↥' +
+                '▲▲▲◀↤▲◁↼↤▲◀‧↿↾◁◀' +
+                '▲▲▶▶▷▲◀↽◀◀▲↦▲▲△▲' +
+                '▲▲↥‧‧▶▶▷△↥▲↦▶▲▲▲' +
+                '↥▲◀▶▼↥△‧▲◀▲◀◀▶▲▲' +
+                '▶▷↿↾▶▶▲↦⇀▲▶▼↿↾▶▲' +
+                '▲◀▲▲◀◀▶▶⇁▼↥▶▲↥↥△' +
+                '△▲▲△△▲▲△‧▶▷△△↦▶▲' +
+                '▲↥▲↿↾▲▲▲↼◀◀↿↾▶▶▼' +
+                '▲↤↿↾↿↾↥◁↽↤↿↾↿↾◁◀' +
+                '▶▶▲▲▲▲◀◀▶▶▲▲▲▲◀◀' +
+                '▲△△▲▲△△▲▲△△▲▲△△▲' +
+                '▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲' +
+                '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾',
+            network_solution=(
+                ((0, 0), (1, 1)),
+                ((0, 0), (2, 2)),
+                ((0, 0), (3, 3)),
+                ((0, 0), (4, 4)),
+                ((0, 0), (5, 5)),
+                ((0, 0), (6, 6)),
+                ((0, 0), (7, 7)),
+                ((0, 0), (8, 8)),
+                ((1, 2), (9, 9)),
+                ((1, 2), (9, 9)),
+                ((3, 4), (10, 10)),
+                ((3, 4), (10, 10)),
+                ((5, 6), (11, 11)),
+                ((5, 6), (11, 11)),
+                ((7, 8), (12, 12)),
+                ((7, 8), (12, 12)),
+                ((9, 10), (13, 13)),
+                ((9, 10), (13, 13)),
+                ((9, 10), (13, 13)),
+                ((9, 10), (13, 13)),
+                ((11, 12), (14, 14)),
+                ((11, 12), (14, 14)),
+                ((11, 12), (14, 14)),
+                ((11, 12), (14, 14)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15)),
+            ),
+            feasible_ok=True,
+        )
+}
 
     # Balancer 6 x 6
     # solve_factorio_belt_balancer((8, 9), 6, [
@@ -703,409 +1013,4 @@ if __name__ == '__main__':
     #     feasible_ok=True,
     #     num_mixers=11,
     #     # deterministic_time=True
-    # )
-
-    # # Balancer 8 x 8
-    # solve_factorio_belt_balancer((8, 10), 8, [
-    #     (0, 0, 'S', 0, 8),
-    #     (1, 0, 'S', 1, 8),
-    #     (2, 0, 'S', 2, 8),
-    #     (3, 0, 'S', 3, 8),
-    #     (4, 0, 'S', 4, 8),
-    #     (5, 0, 'S', 5, 8),
-    #     (6, 0, 'S', 6, 8),
-    #     (7, 0, 'S', 7, 8),
-
-    #     (0, 9, 'N', 0, -1),
-    #     (0, 9, 'N', 1, -1),
-    #     (0, 9, 'N', 2, -1),
-    #     (0, 9, 'N', 3, -1),
-    #     (0, 9, 'N', 4, -1),
-    #     (0, 9, 'N', 5, -1),
-    #     (0, 9, 'N', 6, -1),
-    #     (0, 9, 'N', 7, -1),
-
-    #     (1, 9, 'N', 0, -1),
-    #     (1, 9, 'N', 1, -1),
-    #     (1, 9, 'N', 2, -1),
-    #     (1, 9, 'N', 3, -1),
-    #     (1, 9, 'N', 4, -1),
-    #     (1, 9, 'N', 5, -1),
-    #     (1, 9, 'N', 6, -1),
-    #     (1, 9, 'N', 7, -1),
-
-    #     (2, 9, 'N', 0, -1),
-    #     (2, 9, 'N', 1, -1),
-    #     (2, 9, 'N', 2, -1),
-    #     (2, 9, 'N', 3, -1),
-    #     (2, 9, 'N', 4, -1),
-    #     (2, 9, 'N', 5, -1),
-    #     (2, 9, 'N', 6, -1),
-    #     (2, 9, 'N', 7, -1),
-
-    #     (3, 9, 'N', 0, -1),
-    #     (3, 9, 'N', 1, -1),
-    #     (3, 9, 'N', 2, -1),
-    #     (3, 9, 'N', 3, -1),
-    #     (3, 9, 'N', 4, -1),
-    #     (3, 9, 'N', 5, -1),
-    #     (3, 9, 'N', 6, -1),
-    #     (3, 9, 'N', 7, -1),
-
-    #     (4, 9, 'N', 0, -1),
-    #     (4, 9, 'N', 1, -1),
-    #     (4, 9, 'N', 2, -1),
-    #     (4, 9, 'N', 3, -1),
-    #     (4, 9, 'N', 4, -1),
-    #     (4, 9, 'N', 5, -1),
-    #     (4, 9, 'N', 6, -1),
-    #     (4, 9, 'N', 7, -1),
-
-    #     (5, 9, 'N', 0, -1),
-    #     (5, 9, 'N', 1, -1),
-    #     (5, 9, 'N', 2, -1),
-    #     (5, 9, 'N', 3, -1),
-    #     (5, 9, 'N', 4, -1),
-    #     (5, 9, 'N', 5, -1),
-    #     (5, 9, 'N', 6, -1),
-    #     (5, 9, 'N', 7, -1),
-
-    #     (6, 9, 'N', 0, -1),
-    #     (6, 9, 'N', 1, -1),
-    #     (6, 9, 'N', 2, -1),
-    #     (6, 9, 'N', 3, -1),
-    #     (6, 9, 'N', 4, -1),
-    #     (6, 9, 'N', 5, -1),
-    #     (6, 9, 'N', 6, -1),
-    #     (6, 9, 'N', 7, -1),
-
-    #     (7, 9, 'N', 0, -1),
-    #     (7, 9, 'N', 1, -1),
-    #     (7, 9, 'N', 2, -1),
-    #     (7, 9, 'N', 3, -1),
-    #     (7, 9, 'N', 4, -1),
-    #     (7, 9, 'N', 5, -1),
-    #     (7, 9, 'N', 6, -1),
-    #     (7, 9, 'N', 7, -1),
-    # ], 8,
-    #     # solution=
-    #     #     '↿↾↿↾↿↾↿↾' +
-    #     #     '↥↥↥▲↥↥↥▲' +
-    #     #     '‧▶▷▲◀◀↦▲' +
-    #     #     '△▲◀‧△▲◀◀' +
-    #     #     '▲↤▲▶▲◁◀▲' +
-    #     #     '‧‧↿↾‧‧↿↾' +
-    #     #     '▶▶▲↥▶▶▲↥' +
-    #     #     '↥△△‧↥△△‧' +
-    #     #     '△↿↾△△↿↾△' +
-    #     #     '↿↾↿↾↿↾↿↾',
-    #     solution=
-    #         '↿↾↿↾↿↾↿↾' +
-    #         '‧‧‧‧‧‧‧▲' +
-    #         '‧‧‧‧‧‧‧‧' +
-    #         '‧‧‧‧‧‧‧‧' +
-    #         '‧‧‧‧‧‧‧‧' +
-    #         '‧‧‧‧‧‧‧‧' +
-    #         '‧‧‧‧‧‧‧‧' +
-    #         '‧‧‧‧‧‧‧‧' +
-    #         '‧‧‧‧‧‧‧△' +
-    #         '↿↾↿↾↿↾↿↾',
-    #     # hint_solutions=((
-    #     #     '↿↾↿↾↿↾↿↾' +
-    #     #     '‧↥↥‧‧↿↾‧' +
-    #     #     '‧‧‧‧‧↥↥‧' +
-    #     #     '‧‧‧‧‧‧‧‧' +
-    #     #     '‧‧‧‧‧‧‧‧' +
-    #     #     '‧‧‧‧‧△‧‧' +
-    #     #     '▶▷‧‧↦▲‧‧' +
-    #     #     '▲△△‧‧‧△‧' +
-    #     #     '▲↿↾▶▶▶▲‧' +
-    #     #     '↿↾↿↾‧‧‧‧'
-    #     # ), (
-    #     #     '↿↾↿↾↿↾↿↾' +
-    #     #     '‧↥‧↿↾‧↥‧' +
-    #     #     '‧‧‧▲↥‧‧‧' +
-    #     #     '‧‧‧▲◀◀‧‧' +
-    #     #     '‧‧‧‧‧▲◀‧' +
-    #     #     '‧‧‧‧‧‧▲◀' +
-    #     #     '‧△‧‧‧‧‧▲' +
-    #     #     '‧▲◀◀◀◀△▲' +
-    #     #     '‧‧‧‧△↿↾▲' +
-    #     #     '‧‧‧‧↿↾↿↾'
-    #     # )),
-    #     deterministic_time=True,
-    #     feasible_ok=True,
-    # )
-
-    # # Balancer 8 x 8
-    # solve_factorio_belt_balancer((8, 10), 8, [
-    #     (0, 0, 'S', 0, 1),
-    #     (1, 0, 'S', 0, 1),
-    #     (2, 0, 'S', 0, 1),
-    #     (3, 0, 'S', 0, 1),
-    #     (4, 0, 'S', 0, 1),
-    #     (5, 0, 'S', 0, 1),
-    #     (6, 0, 'S', 0, 1),
-    #     (7, 0, 'S', 0, 1),
-
-    #     (0, 9, 'N', 7, -1),
-    #     (1, 9, 'N', 7, -1),
-    #     (2, 9, 'N', 7, -1),
-    #     (3, 9, 'N', 7, -1),
-    #     (4, 9, 'N', 7, -1),
-    #     (5, 9, 'N', 7, -1),
-    #     (6, 9, 'N', 7, -1),
-    #     (7, 9, 'N', 7, -1),
-    # ], 1, network_solution=(
-    #     ((0, 0), (1, 1)),
-    #     ((0, 0), (2, 2)),
-    #     ((0, 0), (3, 3)),
-    #     ((0, 0), (4, 4)),
-    #     ((1, 2), (5, 5)),
-    #     ((1, 2), (5, 5)),
-    #     ((3, 4), (6, 6)),
-    #     ((3, 4), (6, 6)),
-    #     ((5, 6), (7, 7)),
-    #     ((5, 6), (7, 7)),
-    #     ((5, 6), (7, 7)),
-    #     ((5, 6), (7, 7)),
-    # ), feasible_ok=True)
-
-    # # Balancer 16 x 16
-    # solve_factorio_belt_balancer((16, 16), 16, [
-    #     # 16 inputs at the top, each with flow 16
-    #     (0, 0, 'S', 0, 16),
-    #     (1, 0, 'S', 1, 16),
-    #     (2, 0, 'S', 2, 16),
-    #     (3, 0, 'S', 3, 16),
-    #     (4, 0, 'S', 4, 16),
-    #     (5, 0, 'S', 5, 16),
-    #     (6, 0, 'S', 6, 16),
-    #     (7, 0, 'S', 7, 16),
-    #     (8, 0, 'S', 8, 16),
-    #     (9, 0, 'S', 9, 16),
-    #     (10, 0, 'S', 10, 16),
-    #     (11, 0, 'S', 11, 16),
-    #     (12, 0, 'S', 12, 16),
-    #     (13, 0, 'S', 13, 16),
-    #     (14, 0, 'S', 14, 16),
-    #     (15, 0, 'S', 15, 16),
-
-    #     # Output 0
-    #     (0, 15, 'N', 0, -1), (0, 15, 'N', 1, -1), (0, 15, 'N', 2, -1), (0, 15, 'N', 3, -1),
-    #     (0, 15, 'N', 4, -1), (0, 15, 'N', 5, -1), (0, 15, 'N', 6, -1), (0, 15, 'N', 7, -1),
-    #     (0, 15, 'N', 8, -1), (0, 15, 'N', 9, -1), (0, 15, 'N', 10, -1), (0, 15, 'N', 11, -1),
-    #     (0, 15, 'N', 12, -1), (0, 15, 'N', 13, -1), (0, 15, 'N', 14, -1), (0, 15, 'N', 15, -1),
-
-    #     # Output 1
-    #     (1, 15, 'N', 0, -1), (1, 15, 'N', 1, -1), (1, 15, 'N', 2, -1), (1, 15, 'N', 3, -1),
-    #     (1, 15, 'N', 4, -1), (1, 15, 'N', 5, -1), (1, 15, 'N', 6, -1), (1, 15, 'N', 7, -1),
-    #     (1, 15, 'N', 8, -1), (1, 15, 'N', 9, -1), (1, 15, 'N', 10, -1), (1, 15, 'N', 11, -1),
-    #     (1, 15, 'N', 12, -1), (1, 15, 'N', 13, -1), (1, 15, 'N', 14, -1), (1, 15, 'N', 15, -1),
-
-    #     # Output 2
-    #     (2, 15, 'N', 0, -1), (2, 15, 'N', 1, -1), (2, 15, 'N', 2, -1), (2, 15, 'N', 3, -1),
-    #     (2, 15, 'N', 4, -1), (2, 15, 'N', 5, -1), (2, 15, 'N', 6, -1), (2, 15, 'N', 7, -1),
-    #     (2, 15, 'N', 8, -1), (2, 15, 'N', 9, -1), (2, 15, 'N', 10, -1), (2, 15, 'N', 11, -1),
-    #     (2, 15, 'N', 12, -1), (2, 15, 'N', 13, -1), (2, 15, 'N', 14, -1), (2, 15, 'N', 15, -1),
-
-    #     # Output 3
-    #     (3, 15, 'N', 0, -1), (3, 15, 'N', 1, -1), (3, 15, 'N', 2, -1), (3, 15, 'N', 3, -1),
-    #     (3, 15, 'N', 4, -1), (3, 15, 'N', 5, -1), (3, 15, 'N', 6, -1), (3, 15, 'N', 7, -1),
-    #     (3, 15, 'N', 8, -1), (3, 15, 'N', 9, -1), (3, 15, 'N', 10, -1), (3, 15, 'N', 11, -1),
-    #     (3, 15, 'N', 12, -1), (3, 15, 'N', 13, -1), (3, 15, 'N', 14, -1), (3, 15, 'N', 15, -1),
-
-    #     # Output 4
-    #     (4, 15, 'N', 0, -1), (4, 15, 'N', 1, -1), (4, 15, 'N', 2, -1), (4, 15, 'N', 3, -1),
-    #     (4, 15, 'N', 4, -1), (4, 15, 'N', 5, -1), (4, 15, 'N', 6, -1), (4, 15, 'N', 7, -1),
-    #     (4, 15, 'N', 8, -1), (4, 15, 'N', 9, -1), (4, 15, 'N', 10, -1), (4, 15, 'N', 11, -1),
-    #     (4, 15, 'N', 12, -1), (4, 15, 'N', 13, -1), (4, 15, 'N', 14, -1), (4, 15, 'N', 15, -1),
-
-    #     # Output 5
-    #     (5, 15, 'N', 0, -1), (5, 15, 'N', 1, -1), (5, 15, 'N', 2, -1), (5, 15, 'N', 3, -1),
-    #     (5, 15, 'N', 4, -1), (5, 15, 'N', 5, -1), (5, 15, 'N', 6, -1), (5, 15, 'N', 7, -1),
-    #     (5, 15, 'N', 8, -1), (5, 15, 'N', 9, -1), (5, 15, 'N', 10, -1), (5, 15, 'N', 11, -1),
-    #     (5, 15, 'N', 12, -1), (5, 15, 'N', 13, -1), (5, 15, 'N', 14, -1), (5, 15, 'N', 15, -1),
-
-    #     # Output 6
-    #     (6, 15, 'N', 0, -1), (6, 15, 'N', 1, -1), (6, 15, 'N', 2, -1), (6, 15, 'N', 3, -1),
-    #     (6, 15, 'N', 4, -1), (6, 15, 'N', 5, -1), (6, 15, 'N', 6, -1), (6, 15, 'N', 7, -1),
-    #     (6, 15, 'N', 8, -1), (6, 15, 'N', 9, -1), (6, 15, 'N', 10, -1), (6, 15, 'N', 11, -1),
-    #     (6, 15, 'N', 12, -1), (6, 15, 'N', 13, -1), (6, 15, 'N', 14, -1), (6, 15, 'N', 15, -1),
-
-    #     # Output 7
-    #     (7, 15, 'N', 0, -1), (7, 15, 'N', 1, -1), (7, 15, 'N', 2, -1), (7, 15, 'N', 3, -1),
-    #     (7, 15, 'N', 4, -1), (7, 15, 'N', 5, -1), (7, 15, 'N', 6, -1), (7, 15, 'N', 7, -1),
-    #     (7, 15, 'N', 8, -1), (7, 15, 'N', 9, -1), (7, 15, 'N', 10, -1), (7, 15, 'N', 11, -1),
-    #     (7, 15, 'N', 12, -1), (7, 15, 'N', 13, -1), (7, 15, 'N', 14, -1), (7, 15, 'N', 15, -1),
-
-    #     # Output 8
-    #     (8, 15, 'N', 0, -1), (8, 15, 'N', 1, -1), (8, 15, 'N', 2, -1), (8, 15, 'N', 3, -1),
-    #     (8, 15, 'N', 4, -1), (8, 15, 'N', 5, -1), (8, 15, 'N', 6, -1), (8, 15, 'N', 7, -1),
-    #     (8, 15, 'N', 8, -1), (8, 15, 'N', 9, -1), (8, 15, 'N', 10, -1), (8, 15, 'N', 11, -1),
-    #     (8, 15, 'N', 12, -1), (8, 15, 'N', 13, -1), (8, 15, 'N', 14, -1), (8, 15, 'N', 15, -1),
-
-    #     # Output 9
-    #     (9, 15, 'N', 0, -1), (9, 15, 'N', 1, -1), (9, 15, 'N', 2, -1), (9, 15, 'N', 3, -1),
-    #     (9, 15, 'N', 4, -1), (9, 15, 'N', 5, -1), (9, 15, 'N', 6, -1), (9, 15, 'N', 7, -1),
-    #     (9, 15, 'N', 8, -1), (9, 15, 'N', 9, -1), (9, 15, 'N', 10, -1), (9, 15, 'N', 11, -1),
-    #     (9, 15, 'N', 12, -1), (9, 15, 'N', 13, -1), (9, 15, 'N', 14, -1), (9, 15, 'N', 15, -1),
-
-    #     # Output 10
-    #     (10, 15, 'N', 0, -1), (10, 15, 'N', 1, -1), (10, 15, 'N', 2, -1), (10, 15, 'N', 3, -1),
-    #     (10, 15, 'N', 4, -1), (10, 15, 'N', 5, -1), (10, 15, 'N', 6, -1), (10, 15, 'N', 7, -1),
-    #     (10, 15, 'N', 8, -1), (10, 15, 'N', 9, -1), (10, 15, 'N', 10, -1), (10, 15, 'N', 11, -1),
-    #     (10, 15, 'N', 12, -1), (10, 15, 'N', 13, -1), (10, 15, 'N', 14, -1), (10, 15, 'N', 15, -1),
-
-    #     # Output 11
-    #     (11, 15, 'N', 0, -1), (11, 15, 'N', 1, -1), (11, 15, 'N', 2, -1), (11, 15, 'N', 3, -1),
-    #     (11, 15, 'N', 4, -1), (11, 15, 'N', 5, -1), (11, 15, 'N', 6, -1), (11, 15, 'N', 7, -1),
-    #     (11, 15, 'N', 8, -1), (11, 15, 'N', 9, -1), (11, 15, 'N', 10, -1), (11, 15, 'N', 11, -1),
-    #     (11, 15, 'N', 12, -1), (11, 15, 'N', 13, -1), (11, 15, 'N', 14, -1), (11, 15, 'N', 15, -1),
-
-    #     # Output 12
-    #     (12, 15, 'N', 0, -1), (12, 15, 'N', 1, -1), (12, 15, 'N', 2, -1), (12, 15, 'N', 3, -1),
-    #     (12, 15, 'N', 4, -1), (12, 15, 'N', 5, -1), (12, 15, 'N', 6, -1), (12, 15, 'N', 7, -1),
-    #     (12, 15, 'N', 8, -1), (12, 15, 'N', 9, -1), (12, 15, 'N', 10, -1), (12, 15, 'N', 11, -1),
-    #     (12, 15, 'N', 12, -1), (12, 15, 'N', 13, -1), (12, 15, 'N', 14, -1), (12, 15, 'N', 15, -1),
-
-    #     # Output 13
-    #     (13, 15, 'N', 0, -1), (13, 15, 'N', 1, -1), (13, 15, 'N', 2, -1), (13, 15, 'N', 3, -1),
-    #     (13, 15, 'N', 4, -1), (13, 15, 'N', 5, -1), (13, 15, 'N', 6, -1), (13, 15, 'N', 7, -1),
-    #     (13, 15, 'N', 8, -1), (13, 15, 'N', 9, -1), (13, 15, 'N', 10, -1), (13, 15, 'N', 11, -1),
-    #     (13, 15, 'N', 12, -1), (13, 15, 'N', 13, -1), (13, 15, 'N', 14, -1), (13, 15, 'N', 15, -1),
-
-    #     # Output 14
-    #     (14, 15, 'N', 0, -1), (14, 15, 'N', 1, -1), (14, 15, 'N', 2, -1), (14, 15, 'N', 3, -1),
-    #     (14, 15, 'N', 4, -1), (14, 15, 'N', 5, -1), (14, 15, 'N', 6, -1), (14, 15, 'N', 7, -1),
-    #     (14, 15, 'N', 8, -1), (14, 15, 'N', 9, -1), (14, 15, 'N', 10, -1), (14, 15, 'N', 11, -1),
-    #     (14, 15, 'N', 12, -1), (14, 15, 'N', 13, -1), (14, 15, 'N', 14, -1), (14, 15, 'N', 15, -1),
-
-    #     # Output 15
-    #     (15, 15, 'N', 0, -1), (15, 15, 'N', 1, -1), (15, 15, 'N', 2, -1), (15, 15, 'N', 3, -1),
-    #     (15, 15, 'N', 4, -1), (15, 15, 'N', 5, -1), (15, 15, 'N', 6, -1), (15, 15, 'N', 7, -1),
-    #     (15, 15, 'N', 8, -1), (15, 15, 'N', 9, -1), (15, 15, 'N', 10, -1), (15, 15, 'N', 11, -1),
-    #     (15, 15, 'N', 12, -1), (15, 15, 'N', 13, -1), (15, 15, 'N', 14, -1), (15, 15, 'N', 15, -1),
-    # ], 16,
-    #     # solution=
-    #     #     '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾' +
-    #     #     '▲▲▲▲▲▲▲▲▲▲▲↥↥▲▲▲' +
-    #     #     '▲▲▲↥↥▲↥↥↥▲▲◀◀▲↥↥' +
-    #     #     '▲▲▲◀↤▲◁↼↤▲◀‧↿↾◁◀' +
-    #     #     '▲▲▶▶▷▲◀↽◀◀▲↦▲▲△▲' +
-    #     #     '▲▲↥‧‧▶▶▷△↥▲↦▶▲▲▲' +
-    #     #     '↥▲◀▶▼↥△‧▲◀▲◀◀▶▲▲' +
-    #     #     '▶▷↿↾▶▶▲↦⇀▲▶▼↿↾▶▲' +
-    #     #     '▲◀▲▲◀◀▶▶⇁▼↥▶▲↥↥△' +
-    #     #     '△▲▲△△▲▲△‧▶▷△△↦▶▲' +
-    #     #     '▲↥▲↿↾▲▲▲↼◀◀↿↾▶▶▼' +
-    #     #     '▲↤↿↾↿↾↥◁↽↤↿↾↿↾◁◀' +
-    #     #     '▶▶▲▲▲▲◀◀▶▶▲▲▲▲◀◀' +
-    #     #     '▲△△▲▲△△▲▲△△▲▲△△▲' +
-    #     #     '▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲' +
-    #     #     '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾',
-    #     feasible_ok=True,
-    # )
-
-    # # Balancer 16 x 16
-    # solve_factorio_belt_balancer((16, 14), 16, [
-    #     # Inputs
-    #     (0, 0, 'S', 0, 1),
-    #     (1, 0, 'S', 0, 1),
-    #     (2, 0, 'S', 0, 1),
-    #     (3, 0, 'S', 0, 1),
-    #     (4, 0, 'S', 0, 1),
-    #     (5, 0, 'S', 0, 1),
-    #     (6, 0, 'S', 0, 1),
-    #     (7, 0, 'S', 0, 1),
-    #     (8, 0, 'S', 0, 1),
-    #     (9, 0, 'S', 0, 1),
-    #     (10, 0, 'S', 0, 1),
-    #     (11, 0, 'S', 0, 1),
-    #     (12, 0, 'S', 0, 1),
-    #     (13, 0, 'S', 0, 1),
-    #     (14, 0, 'S', 0, 1),
-    #     (15, 0, 'S', 0, 1),
-
-    #     # Outputs
-    #     (0, 13, 'N', 15, -1),
-    #     (1, 13, 'N', 15, -1),
-    #     (2, 13, 'N', 15, -1),
-    #     (3, 13, 'N', 15, -1),
-    #     (4, 13, 'N', 15, -1),
-    #     (5, 13, 'N', 15, -1),
-    #     (6, 13, 'N', 15, -1),
-    #     (7, 13, 'N', 15, -1),
-    #     (8, 13, 'N', 15, -1),
-    #     (9, 13, 'N', 15, -1),
-    #     (10, 13, 'N', 15, -1),
-    #     (11, 13, 'N', 15, -1),
-    #     (12, 13, 'N', 15, -1),
-    #     (13, 13, 'N', 15, -1),
-    #     (14, 13, 'N', 15, -1),
-    #     (15, 13, 'N', 15, -1),
-    # ], 1,
-    #     # solution=
-    #     #     '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾' +
-    #     #     '▲▲▲▲▲▲▲▲▲▲▲↥↥▲▲▲' +
-    #     #     '▲▲▲↥↥▲↥↥↥▲▲◀◀▲↥↥' +
-    #     #     '▲▲▲◀↤▲◁↼↤▲◀‧↿↾◁◀' +
-    #     #     '▲▲▶▶▷▲◀↽◀◀▲↦▲▲△▲' +
-    #     #     '▲▲↥‧‧▶▶▷△↥▲↦▶▲▲▲' +
-    #     #     '↥▲◀▶▼↥△‧▲◀▲◀◀▶▲▲' +
-    #     #     '▶▷↿↾▶▶▲↦⇀▲▶▼↿↾▶▲' +
-    #     #     '▲◀▲▲◀◀▶▶⇁▼↥▶▲↥↥△' +
-    #     #     '△▲▲△△▲▲△‧▶▷△△↦▶▲' +
-    #     #     '▲↥▲↿↾▲▲▲↼◀◀↿↾▶▶▼' +
-    #     #     '▲↤↿↾↿↾↥◁↽↤↿↾↿↾◁◀' +
-    #     #     '▶▶▲▲▲▲◀◀▶▶▲▲▲▲◀◀' +
-    #     #     '▲△△▲▲△△▲▲△△▲▲△△▲' +
-    #     #     '▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲' +
-    #     #     '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾',
-    #     network_solution=(
-    #         ((0, 0), (1, 1)),
-    #         ((0, 0), (2, 2)),
-    #         ((0, 0), (3, 3)),
-    #         ((0, 0), (4, 4)),
-    #         ((0, 0), (5, 5)),
-    #         ((0, 0), (6, 6)),
-    #         ((0, 0), (7, 7)),
-    #         ((0, 0), (8, 8)),
-    #         ((1, 2), (9, 9)),
-    #         ((1, 2), (9, 9)),
-    #         ((3, 4), (10, 10)),
-    #         ((3, 4), (10, 10)),
-    #         ((5, 6), (11, 11)),
-    #         ((5, 6), (11, 11)),
-    #         ((7, 8), (12, 12)),
-    #         ((7, 8), (12, 12)),
-    #         ((9, 10), (13, 13)),
-    #         ((9, 10), (13, 13)),
-    #         ((9, 10), (13, 13)),
-    #         ((9, 10), (13, 13)),
-    #         ((11, 12), (14, 14)),
-    #         ((11, 12), (14, 14)),
-    #         ((11, 12), (14, 14)),
-    #         ((11, 12), (14, 14)),
-    #         ((13, 14), (15, 15)),
-    #         ((13, 14), (15, 15)),
-    #         ((13, 14), (15, 15)),
-    #         ((13, 14), (15, 15)),
-    #         ((13, 14), (15, 15)),
-    #         ((13, 14), (15, 15)),
-    #         ((13, 14), (15, 15)),
-    #         ((13, 14), (15, 15)),
-    #     ),
-    #     deterministic_time=True,
-    #     feasible_ok=True,
-    # )
-
-    # # Single belt balancer with solution
-    # solve_factorio_belt_balancer((3, 3), 1, [
-    #     (0, 2, 'N', 0, -1),
-    #     (0, 0, 'S', 0, 1),
-    # ], 1, solution=
-    #     '▲‧‧\n' +
-    #     '▲‧‧\n' +
-    #     '▲‧‧\n'
     # )

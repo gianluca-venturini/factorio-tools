@@ -362,7 +362,9 @@ def viz_flows(solver, f, grid_size, num_flows):
 
 
 provided_solution = set()
-def load_solution(solver, variables, solution, grid_size, is_hint=False):
+def load_solution(solver, variables, solution, grid_size, num_mixers, is_hint=False):
+    b, m, ua, ub = variables
+
     def add_solution(variable, value):
         if variable.name in provided_solution:
             # Skip variables that have already been set
@@ -373,7 +375,12 @@ def load_solution(solver, variables, solution, grid_size, is_hint=False):
         else:
             solver.Add(variable == value)
 
-    b, m, ua, ub = variables
+    def add_mixer_solution(i, j, d, value):
+        if is_hint:
+            for n in range(num_mixers):
+                add_solution(m[i][j][DIRECTIONS.index(d)][n], value)
+        else:
+            solver.Add(sum(m[i][j][DIRECTIONS.index(d)][n] for n in range(num_mixers)) == value)
     
     def render_new_line():
         pass
@@ -382,13 +389,13 @@ def load_solution(solver, variables, solution, grid_size, is_hint=False):
     def render_b(i, j, d):
         add_solution(b[i][j][DIRECTIONS.index(d)], 1)
     def render_m(i, j, d, c):
-        add_solution(m[i][j][DIRECTIONS.index(d)][c], 1)
+        add_mixer_solution(i, j, d, 1)
     def render_ua(i, j, d):
         add_solution(ua[i][j][DIRECTIONS.index(d)], 1)
     def render_ub(i, j, d):
         add_solution(ub[i][j][DIRECTIONS.index(d)], 1)
     
-    visit_solution(provided_solution, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
+    visit_solution(solution, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
 
 def visit_solution(solution, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub):
     W, H = grid_size
