@@ -2,22 +2,21 @@ from itertools import count
 import json
 import zlib
 import base64
-from utils import visitor_components
+from utils import visit_solution
 
 # Blueprint representation of belt direction
 BELT_DIRECTION_TO_BLUEPRINT_DIRECTION = {
-    'N': 6,
-    'S': 2,
-    'E': 0,
-    'W': 4,
+    'N': 0,
+    'S': 4,
+    'E': 2,
+    'W': 6,
 }
 
 UNDERGROUND_BELT_DIRECTION_TO_BLUEPRINT_DIRECTION = {
-    # Note: these mappings may be incorrect, need to double check them
-    'N': 6,
-    'S': 2,
-    'E': 0,
-    'W': 4,
+    'N': 0,
+    'S': 4,
+    'E': 2,
+    'W': 6,
 }
 
 # Blueprint mixers coordinates are centered, so we need to apply an offset based on the direction
@@ -28,7 +27,10 @@ MIXER_FIRST_CELL_BLUEPRINT_OFFSET = {
     'W': (0, 0.5),
 }
 
-def generate_entities_blueprint(solver, variables, grid_size):
+FACTORIO_BLUEPRINT_VERSION = 281479276344320 # Factorio version 1.1.0
+
+def generate_entities_blueprint(solution, grid_size):
+    W, H = grid_size
     unique_entity_number_generator = count(1)
 
     result = []
@@ -36,7 +38,7 @@ def generate_entities_blueprint(solver, variables, grid_size):
         result.append({
             "entity_number": next(unique_entity_number_generator),
             "name": "transport-belt",
-            "position": { "x": i, "y": j },
+            "position": { "x": i, "y": H - 1 - j },
             "direction": BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d]
         })
     def render_m(i, j, d, c):
@@ -46,14 +48,14 @@ def generate_entities_blueprint(solver, variables, grid_size):
             result.append({
                 "entity_number": next(unique_entity_number_generator),
                 "name": "splitter",
-                "position": { "x": i + offset[0], "y": j + offset[1] },
+                "position": { "x": i + offset[0], "y": H - 1 - (j + offset[1]) },
                 "direction": BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d]
             })
     def render_u(i, j, d, c):
         result.append({
             "entity_number": next(unique_entity_number_generator),
             "name": "underground-belt",
-            "position": { "x": i, "y": j },
+            "position": { "x": i, "y": H - 1 - j },
             "type": "input" if c == 0 else "output",
             "direction": UNDERGROUND_BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d],
         })
@@ -66,13 +68,9 @@ def generate_entities_blueprint(solver, variables, grid_size):
     def render_new_line():
         pass
 
-    visitor_components(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
-    return result
+    visit_solution(solution, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
 
-def encode_components_blueprint_json(solver, variables, grid_size):
-    # Use this tool to test this code online: https://factorioblueprints.tech/user/blueprint-create
-
-    blueprint_json = {
+    return {
         "blueprint": {
             "item": "blueprint",
             "label": "Belt balancer ",
@@ -82,10 +80,13 @@ def encode_components_blueprint_json(solver, variables, grid_size):
                     "index": 1
                 }
             ],
-            "entities": generate_entities_blueprint(solver, variables, grid_size),
-            "version": 281479276344320 # Factorio version 1.1.0
+            "entities": result,
+            "version": FACTORIO_BLUEPRINT_VERSION
         }
     }
+
+def encode_components_blueprint_json(blueprint_json):
+    # Use this tool to test this code online: https://factorioblueprints.tech/user/blueprint-create
 
     # Serialize the JSON object to a compact string
     json_str = json.dumps(blueprint_json, separators=(',', ':'))
@@ -101,3 +102,9 @@ def encode_components_blueprint_json(solver, variables, grid_size):
     blueprint_string = '0' + base64_encoded
 
     return blueprint_string
+
+if __name__ == '__main__':
+    # Test the encoding of a blueprint
+    blueprint_json = generate_entities_blueprint('▲', (1, 1))
+    encoded_blueprint = encode_components_blueprint_json(blueprint_json)
+    print(encoded_blueprint)

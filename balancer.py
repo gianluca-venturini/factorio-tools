@@ -18,7 +18,7 @@ from utils import (
     underground_entrance_flow_direction, 
     load_solution
 )
-from blueprint import encode_components_blueprint_json
+from blueprint import encode_components_blueprint_json, generate_entities_blueprint
 
 '''
 Finds the minimum area of a belt balancer for a given grid size and input flows
@@ -437,8 +437,9 @@ def solve_factorio_belt_balancer(
         print(viz_flows(solver_cp, uf, grid_size, num_sources))
         # print(f'Minimum area: {solver.Objective().Value()}')
         # print('Blueprint')
-        print(encode_components_blueprint_json(solver_cp, (b, m, ua, ub), grid_size))
-        return viz_components(solver_cp, variables, grid_size)
+        solution = viz_components(solver_cp, variables, grid_size)
+        print(encode_components_blueprint_json(generate_entities_blueprint(solution, grid_size)))
+        return solution
     elif status == cp_model.INFEASIBLE:
         print('No optimal solution found.')
         return None
