@@ -11,16 +11,9 @@ python -m unittest discover -p '*_test.py'
 ## Convert blueprints
 echo "my_base64_string_without_first_byte" | base64 -D | zlib-flate -uncompress
 
-### TODO
-- Check that blueprints are rendered correctly
-- Make sure underground belts don't overlap
-- Write tests for underground belts
-
 ### Learnings
 - Underground belts entrances can't be placed between entrance and exit
 
-
-## Performance improvements
 - Start with MIP model and SCIP
 - Inverting two flows
     - Optimal solution is 13.
@@ -38,7 +31,8 @@ solve_factorio_belt_balancer((5, 6), 2, [
 - Adding feasibility mode rather than optimal solution only
 - Discretizing continuous flow into integer flow
 - Migrate to CP-SAT
-- Migrated undeground representation to lower dimensionality and more constraints
+- Modeling underground belts with underground flow is more efficient than modeling entrance/exit in a single variable
+    - Migrated undeground representation to lower dimensionality and more constraints
 - Used directly component variables in objective function (-16%)
     - before: 75s
     - after 63s
@@ -74,7 +68,9 @@ solve_factorio_belt_balancer((5, 6), 2, [
             - hint: mixers=1 (767.999) -- best for some reason
             - hint: belts=1, mixers=1, underground=1 (1475.37) -- 
             - hint: belts=1, mixers=0, underground=0 (1475.37) -- 
-            - hint: belts=0, mixers=1, underground=0 (767.999) -- 
+            - hint: belts=0, mixers=1, underground=0 (767.999) --
+
+- Supplying pre-solved network increases performance drastically
 
 
 
