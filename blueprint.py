@@ -37,7 +37,7 @@ def generate_entities_blueprint(solution, grid_size):
     def render_b(i, j, d):
         result.append({
             "entity_number": next(unique_entity_number_generator),
-            "name": "transport-belt",
+            "name": "express-transport-belt",
             "position": { "x": i, "y": H - 1 - j },
             "direction": BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d]
         })
@@ -47,14 +47,14 @@ def generate_entities_blueprint(solution, grid_size):
             offset = MIXER_FIRST_CELL_BLUEPRINT_OFFSET[d]
             result.append({
                 "entity_number": next(unique_entity_number_generator),
-                "name": "splitter",
+                "name": "express-splitter",
                 "position": { "x": i + offset[0], "y": H - 1 - (j + offset[1]) },
                 "direction": BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d]
             })
     def render_u(i, j, d, c):
         result.append({
             "entity_number": next(unique_entity_number_generator),
-            "name": "underground-belt",
+            "name": "express-underground-belt",
             "position": { "x": i, "y": H - 1 - j },
             "type": "input" if c == 0 else "output",
             "direction": UNDERGROUND_BELT_DIRECTION_TO_BLUEPRINT_DIRECTION[d],
