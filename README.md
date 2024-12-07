@@ -1,3 +1,12 @@
+# Factorio belt placement
+This is a Factorio maximum throughput belt balancer placement tool.
+A maximum throughput belt balancer is a type of balancer that sends the same amount of input to every output, at the same time ensuring the maximum theoretical throughput.
+This solver is only finding a balancer, if it exists, given the NxM grid size, it won't attempt to minimize the grid size.
+
+To find the optimal solution it uses a combination of CP-SAT solver and optimization heuristics.
+
+This is a toy project to teach myself how to iterate on problem solving using a MIP or CP-SAT solvers.
+
 ## Install dependencies
 pyenv install 3.9.13
 pyenv global 3.9.13
