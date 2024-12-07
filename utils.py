@@ -291,7 +291,7 @@ def viz_components(solver, variables, grid_size):
         nonlocal result
         result += '\n'
 
-    visitor_components(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
+    visit_solver_variables(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
     return result
 
 '''
@@ -299,7 +299,7 @@ Visit all the cells and call the render_*() functions to render all the elements
 It's guaranteed to complete the entire row before proceeding to the next one.
 Starts from coordinate 0, 0.
 '''
-def visitor_components(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub):
+def visit_solver_variables(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub):
     W, H = grid_size
     b, m, ua, ub = variables
     # Iterate backward since Y axis is inverted
@@ -363,7 +363,6 @@ def viz_flows(solver, f, grid_size, num_flows):
 
 provided_solution = set()
 def load_solution(solver, variables, solution, grid_size, is_hint=False):
-
     def add_solution(variable, value):
         if variable.name in provided_solution:
             # Skip variables that have already been set
@@ -374,28 +373,46 @@ def load_solution(solver, variables, solution, grid_size, is_hint=False):
         else:
             solver.Add(variable == value)
 
+    b, m, ua, ub = variables
+    
+    def render_new_line():
+        pass
+    def render_empty():
+        pass
+    def render_b(i, j, d):
+        add_solution(b[i][j][DIRECTIONS.index(d)], 1)
+    def render_m(i, j, d, c):
+        add_solution(m[i][j][DIRECTIONS.index(d)][c], 1)
+    def render_ua(i, j, d):
+        add_solution(ua[i][j][DIRECTIONS.index(d)], 1)
+    def render_ub(i, j, d):
+        add_solution(ub[i][j][DIRECTIONS.index(d)], 1)
+    
+    visit_solution(provided_solution, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
+
+def visit_solution(solution, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub):
+    W, H = grid_size
     normalize_solution = solution.replace('\n', '')
     if len(normalize_solution) != grid_size[0] * grid_size[1]:
         raise Exception(f'Invalid solution size: {len(normalize_solution)} != {grid_size[0] * grid_size[1]}')
-    W, H = grid_size
-    b, m, ua, ub = variables
-    # get an iterator of the solution that returns on characters every time
     solution_iterator = iter(normalize_solution)
     for j in range(H - 1, -1, -1):
         for i in range(W):
             char = next(solution_iterator)
             if char == EMPTY_SYMBOL:
+                render_empty()
                 continue
             if char in BELT_SYMBOL.values():
                 d = next(key for key, value in BELT_SYMBOL.items() if value == char)
-                add_solution(b[i][j][DIRECTIONS.index(d)], 1)
+                render_b(i, j, d)
             elif char in [v[0] for v in MIXER_SYMBOL.values()]:
                 d = next(key for key, value in MIXER_SYMBOL.items() if value[0] == char)
-                add_solution(m[i][j][DIRECTIONS.index(d)], 1)
+                render_m(i, j, d, 0)
             elif any(char in v for v in UNDERGROUND_BELT_SYMBOL.values()):
                 d = next(key for key, value in UNDERGROUND_BELT_SYMBOL.items() if value[0] == char or value[1] == char)
                 if char == UNDERGROUND_BELT_SYMBOL[d][0]:
-                    add_solution(ua[i][j][DIRECTIONS.index(d)], 1)
+                    render_ua(i, j, d)
                 elif char == UNDERGROUND_BELT_SYMBOL[d][1]:
-                    add_solution(ub[i][j][DIRECTIONS.index(d)], 1)
+                    render_ub(i, j, d)
+        render_new_line()
 
