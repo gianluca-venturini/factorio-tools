@@ -317,7 +317,7 @@ def visit_solver_variables(solver, variables, grid_size, render_new_line, render
             for d in range(len(DIRECTIONS)):
                 if found:
                     break
-                if any([solver.Value(m[i][j][d][n]) > 0 for n in range(len(m[i][j][d]))]):
+                if solver.Value(m[i][j][d]) > 0:
                     render_m(i, j, DIRECTIONS[d], 0)
                     found = True
             # Visualize the mixer second cell
@@ -325,7 +325,7 @@ def visit_solver_variables(solver, variables, grid_size, render_new_line, render
                 if found:
                     break
                 ci, cj = mixer_first_cell(i, j, DIRECTIONS[d])
-                if inside_grid(ci, cj, grid_size) and any([solver.Value(m[ci][cj][d][n]) > 0 for n in range(len(m[ci][cj][d]))]):
+                if inside_grid(ci, cj, grid_size) and solver.Value(m[ci][cj][d]) > 0:
                     render_m(i, j, DIRECTIONS[d], 1)
                     found = True
             # Visualize the underground belt
@@ -377,10 +377,9 @@ def load_solution(solver, variables, solution, grid_size, num_mixers, is_hint=Fa
 
     def add_mixer_solution(i, j, d, value):
         if is_hint:
-            for n in range(num_mixers):
-                add_solution(m[i][j][DIRECTIONS.index(d)][n], value)
+            add_solution(m[i][j][DIRECTIONS.index(d)], value)
         else:
-            solver.Add(sum(m[i][j][DIRECTIONS.index(d)][n] for n in range(num_mixers)) == value)
+            solver.Add(m[i][j][DIRECTIONS.index(d)] == value)
     
     def render_new_line():
         pass

@@ -55,7 +55,7 @@ def solve_factorio_belt_balancer(
     # belt in a direction
     b = [[[solver.NewBoolVar(f'b_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # mixer in a direction. note that i, j are the left cell of the mixer
-    m = [[[[solver.NewBoolVar(f'm_{i}_{j}_{d}_{n}') for n in range(num_mixers)] for d in DIRECTIONS] for j in range(H)] for i in range(W)]
+    m = [[[solver.NewBoolVar(f'm_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
     # underground belt in a direction
     # entrance
     ua = [[[solver.NewBoolVar(f'ua_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
@@ -73,8 +73,8 @@ def solve_factorio_belt_balancer(
     def components_in_cell(i, j):
         return (
             [b[i][j][d] for d in range(len(DIRECTIONS))] +
-            [m[i][j][d][n] for n in range(num_mixers) for d in range(len(DIRECTIONS)) if mixer_can_be_placed(i, j, DIRECTIONS[d], grid_size)] +
-            [m[ci][cj][d][n] for n in range(num_mixers) for d in range(len(DIRECTIONS)) for ci, cj in [mixer_first_cell(i, j, DIRECTIONS[d])] if inside_grid(ci, cj, grid_size)] +
+            [m[i][j][d] for d in range(len(DIRECTIONS)) if mixer_can_be_placed(i, j, DIRECTIONS[d], grid_size)] +
+            [m[ci][cj][d] for d in range(len(DIRECTIONS)) for ci, cj in [mixer_first_cell(i, j, DIRECTIONS[d])] if inside_grid(ci, cj, grid_size)] +
             [ua[i][j][d] for d in range(len(DIRECTIONS))] +
             [ub[i][j][d] for d in range(len(DIRECTIONS))]
         )
@@ -211,16 +211,23 @@ def solve_factorio_belt_balancer(
     for i in range(W):
         for j in range(H):
             for d in range(len(DIRECTIONS)):
-                for n in range(num_mixers):
-                    if not mixer_can_be_placed(i, j, DIRECTIONS[d], grid_size):
-                        solver.Add(m[i][j][d][n] == 0)
+                if not mixer_can_be_placed(i, j, DIRECTIONS[d], grid_size):
+                    solver.Add(m[i][j][d] == 0)
 
 
     # Source flow constraints on every mixer
     if network_solution is not None:
-        # Only one mixer of any type can be placed
+        # Create boolean variables to represent mixer type conditions
+        mixer_network = [[[solver.NewBoolVar(f"mixer_network_{i}_{j}_{n}") for n in range(num_mixers)] for j in range(H)] for i in range(W)]
+    
+        # Enforce that exactly one mixer is placed for each element in network_solution
         for n in range(num_mixers):
-            solver.Add(sum(m[i][j][d][n] for d in range(len(DIRECTIONS)) for j in range(H) for i in range(W)) == 1)
+            solver.Add(sum(mixer_network[i][j][n] for i in range(W) for j in range(H)) == 1)
+
+        for i in range(W):
+            for j in range(H):
+                for d in range(len(DIRECTIONS)):
+                    solver.Add(sum(mixer_network[i][j][n] for n in range(num_mixers)) == 1).only_enforce_if(m[i][j][d])
 
         for n in range(num_mixers):
             inputs, outputs = network_solution[n]
@@ -241,34 +248,34 @@ def solve_factorio_belt_balancer(
                                     for s in range(num_sources)
                                 ) == 
                                 0
-                            ).only_enforce_if(m[i][j][d][n])
+                            ).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
                             # Output flow is evenly distributed in the two cell outputs: the two outputs are identical
-                            solver.Add(sum(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] for s in range(num_sources)) == 0).only_enforce_if(m[i][j][d][n])
+                            solver.Add(sum(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] for s in range(num_sources)) == 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
                             zero_directions = mixer_zero_directions(DIRECTIONS[d])
                             for s in range(num_sources):
                                 for dir in zero_directions:
-                                    solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
-                                    solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
+                                    solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
 
                                 if s in inputs:
                                     # Input sources flow is gte zero
-                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
-                                    solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
+                                    solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
                                     # Force the source to enter from one of the two cells
-                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] > 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] + f[ci][cj][s][mixer_input_direction_idx(d)] > 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
                                 else:
-                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-                                    solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[i][j][s][mixer_input_direction_idx(d)] == 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
+                                    solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] == 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
 
                                 if s in outputs:
                                     # Output sources flow is lte zero
-                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
-                                    solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
+                                    solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
                                     # Force the source to exit from one of the two cells
-                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] < 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] + f[ci][cj][s][mixer_output_direction_idx(d)] < 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
                                 else:
-                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
-                                    solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][n])
+                                    solver.Add(f[i][j][s][mixer_output_direction_idx(d)] == 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
+                                    solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if([m[i][j][d], mixer_network[i][j][n]])
     else:
         # Regular flow through mixer
         for i in range(W):
@@ -284,20 +291,20 @@ def solve_factorio_belt_balancer(
                                 0
                             ).only_enforce_if(m[i][j][d])
                             # Output flow is evenly distributed in the two cell outputs: the two outputs are identical
-                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d][0])
+                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] - f[ci][cj][s][mixer_output_direction_idx(d)] == 0).only_enforce_if(m[i][j][d])
                             # Input flows are gte zero
-                            solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][0])
-                            solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d][0])
+                            solver.Add(f[i][j][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d])
+                            solver.Add(f[ci][cj][s][mixer_input_direction_idx(d)] >= 0).only_enforce_if(m[i][j][d])
                             # Output flows are lte zero
-                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][0])
-                            solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d][0])
+                            solver.Add(f[i][j][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d])
+                            solver.Add(f[ci][cj][s][mixer_output_direction_idx(d)] <= 0).only_enforce_if(m[i][j][d])
                             # Zero flow from all the other directions that are not input or output
                             directions = mixer_zero_directions(DIRECTIONS[d])
                             for dir in directions:
                                 # cell 1
-                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][0])
+                                solver.Add(f[i][j][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d])
                                 # cell 2
-                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d][0])
+                                solver.Add(f[ci][cj][s][DIRECTIONS.index(dir)] == 0).only_enforce_if(m[i][j][d])
 
     ##
     ## Underground belt constraints
@@ -401,7 +408,6 @@ def solve_factorio_belt_balancer(
     if not feasible_ok:
         objective1 = sum(
             [b[i][j][d] for i in range(W) for j in range(H) for d in range(len(DIRECTIONS))] +
-            [3 * m[i][j][d][n] for n in range(num_mixers) for i in range(W) for j in range(H) for d in range(len(DIRECTIONS))] +
             [2 * ua[i][j][d] for i in range(W) for j in range(H) for d in range(len(DIRECTIONS))] +
             [2 * ub[i][j][d] for i in range(W) for j in range(H) for d in range(len(DIRECTIONS))]
         )
@@ -481,11 +487,11 @@ BALANCERS = {
     # 1 mixer with network solution
     '1_m_n': lambda:
         solve_factorio_belt_balancer((2, 1), 2, [
-            (0, 0, 'S', 0, 2),
-            (1, 0, 'S', 0, 2),
-            (0, 0, 'N', 1, -2),
-            (1, 0, 'N', 1, -2),
-        ], 2, network_solution=(
+            (0, 0, 'S', 0, 1),
+            (1, 0, 'S', 0, 1),
+            (0, 0, 'N', 1, -1),
+            (1, 0, 'N', 1, -1),
+        ], 1, network_solution=(
             ((0, 0), (1, 1)),
         )),
     # Swap two belts
