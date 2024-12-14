@@ -118,8 +118,8 @@ class TestFactorioBalancer(unittest.TestCase):
         ], 2)
         # Single mixer that goes up
         self.assertEqual(result,
-            '↿↾\n'
             '▲▲\n'
+            '↿↾\n'
         )
 
     def test_solve_factorio_belt_balancer_mixer_belt_2_3(self):
@@ -134,8 +134,8 @@ class TestFactorioBalancer(unittest.TestCase):
         ], 2, disable_underground=True)
         # Single mixer that goes up
         self.assertEqual(result,
-            '↿↾\n'
             '▲▲\n'
+            '↿↾\n'
             '▲▲\n'
         )
 
@@ -192,12 +192,12 @@ class TestFactorioBalancer(unittest.TestCase):
             '‧‧\n' +
             '△‧\n'
         )
-        # One belt that goes down
+        # One belt that goes up
         self.assertEqual(result,
             '↿↾\n' +
-            '▲‧\n' +
-            '▲‧\n' +
-            '▲‧\n'
+            '↥‧\n' +
+            '‧‧\n' +
+            '△‧\n'
         )
 
 if __name__ == '__main__':

@@ -257,16 +257,6 @@ def viz_occupied(solver, x, grid_size):
         result += '\n'
     return result
 
-def viz_belts(solver, b, grid_size):
-    W, H = grid_size
-    result = ''
-    # Iterate backward since Y axis is inverted
-    for j in range(H-1, -1, -1):
-        for i in range(W):
-            result += ''.join([f"{BELT_SYMBOL[DIRECTIONS[d]]}" if solver.Value(b[i][j][d]) > 0 else '' for d in range(len(DIRECTIONS))]) if sum(solver.Value(b[i][j][d]) for d in range(len(DIRECTIONS))) > 0 else 'O'
-        result += '\n'
-    return result
-
 '''
 Visualizes all the components of the belt balancer
 '''
@@ -301,7 +291,7 @@ Starts from coordinate 0, 0.
 '''
 def visit_solver_variables(solver, variables, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub):
     W, H = grid_size
-    b, m, ua, ub = variables
+    b, m, ua, ub, dc, dm = variables
     # Iterate backward since Y axis is inverted
     for j in range(H-1, -1, -1):
         for i in range(W):
@@ -310,14 +300,14 @@ def visit_solver_variables(solver, variables, grid_size, render_new_line, render
             for d in range(len(DIRECTIONS)):
                 if found:
                     break
-                if solver.Value(b[i][j][d]) > 0:
+                if solver.Value(b[i][j]) > 0 and solver.Value(dc[i][j][d]) > 0:
                     render_b(i, j, DIRECTIONS[d])
                     found = True
             # Visualize the mixer first cell
             for d in range(len(DIRECTIONS)):
                 if found:
                     break
-                if solver.Value(m[i][j][d]) > 0:
+                if solver.Value(m[i][j]) > 0 and solver.Value(dc[i][j][d]) > 0:
                     render_m(i, j, DIRECTIONS[d], 0)
                     found = True
             # Visualize the mixer second cell
@@ -325,18 +315,18 @@ def visit_solver_variables(solver, variables, grid_size, render_new_line, render
                 if found:
                     break
                 ci, cj = mixer_first_cell(i, j, DIRECTIONS[d])
-                if inside_grid(ci, cj, grid_size) and solver.Value(m[ci][cj][d]) > 0:
+                if inside_grid(ci, cj, grid_size) and solver.Value(m[ci][cj]) > 0 and solver.Value(dc[ci][cj][d]) > 0:
                     render_m(i, j, DIRECTIONS[d], 1)
                     found = True
             # Visualize the underground belt
             for d in range(len(DIRECTIONS)):
                 if found:
                     break
-                if solver.Value(ua[i][j][d]) > 0:
+                if solver.Value(ua[i][j]) > 0  and solver.Value(dc[i][j][d]) > 0:
                     render_ua(i, j, DIRECTIONS[d])
                     found = True
                     break
-                if solver.Value(ub[i][j][d]) > 0:
+                if solver.Value(ub[i][j]) > 0 and solver.Value(dc[i][j][d]) > 0:
                     render_ub(i, j, DIRECTIONS[d])
                     found = True
             if not found:
@@ -359,11 +349,26 @@ def viz_flows(solver, f, grid_size, num_flows):
         result += '\n'
     return result
 
-
+def viz_variables_verbose(solver_cp, variables):
+    b, m, ua, ub, dc, dm = variables
+    for i in range(W):
+        for j in range(H):
+            print(f'b_{i}_{j} = {solver_cp.Value(b[i][j])}')
+            print(f'm_{i}_{j} = {solver_cp.Value(m[i][j])}')
+            print(f'ua_{i}_{j} = {solver_cp.Value(ua[i][j])}')
+            print(f'ub_{i}_{j} = {solver_cp.Value(ub[i][j])}')
+            # for s in range(num_sources):
+            #     for d in range(len(DIRECTIONS)):
+            #     print(f'f_{i}_{j}_{s}_{DIRECTIONS[d]} = {solver_cp.Value(f[i][j][s][d])}')
+            #     print(f'uf_{i}_{j}_{s}_{DIRECTIONS[d]} = {solver_cp.Value(uf[i][j][s][d])}')
+            for d in range(len(DIRECTIONS)):
+                print(f'dm_{i}_{j}_{DIRECTIONS[d]} = {solver_cp.Value(dm[i][j][d])}')
+            for d in range(len(DIRECTIONS)):
+                print(f'dc_{i}_{j}_{DIRECTIONS[d]} = {solver_cp.Value(dc[i][j][d])}')
 
 provided_solution = set()
 def load_solution(solver, variables, solution, grid_size, num_mixers, is_hint=False):
-    b, m, ua, ub = variables
+    b, m, ua, ub, dc, dm = variables
 
     def add_solution(variable, value):
         if variable.name in provided_solution:
@@ -377,22 +382,27 @@ def load_solution(solver, variables, solution, grid_size, num_mixers, is_hint=Fa
 
     def add_mixer_solution(i, j, d, value):
         if is_hint:
-            add_solution(m[i][j][DIRECTIONS.index(d)], value)
+            add_solution(m[i][j], value)
+            add_solution(dc[i][j][DIRECTIONS.index(d)], value)
         else:
-            solver.Add(m[i][j][DIRECTIONS.index(d)] == value)
+            solver.Add(m[i][j] == value)
+            solver.Add(dc[i][j][DIRECTIONS.index(d)] == value)
     
     def render_new_line():
         pass
     def render_empty():
         pass
     def render_b(i, j, d):
-        add_solution(b[i][j][DIRECTIONS.index(d)], 1)
+        add_solution(b[i][j], 1)
+        add_solution(dc[i][j][DIRECTIONS.index(d)], 1)
     def render_m(i, j, d, c):
         add_mixer_solution(i, j, d, 1)
     def render_ua(i, j, d):
-        add_solution(ua[i][j][DIRECTIONS.index(d)], 1)
+        add_solution(ua[i][j], 1)
+        add_solution(dc[i][j][DIRECTIONS.index(d)], 1)
     def render_ub(i, j, d):
-        add_solution(ub[i][j][DIRECTIONS.index(d)], 1)
+        add_solution(ub[i][j], 1)
+        add_solution(dc[i][j][DIRECTIONS.index(d)], 1)
     
     visit_solution(solution, grid_size, render_new_line, render_empty, render_b, render_m, render_ua, render_ub)
 
