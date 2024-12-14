@@ -433,6 +433,8 @@ def solve_factorio_belt_balancer(
 
     solver_cp = cp_model.CpSolver()
     solver_cp.parameters.log_search_progress = True  # This enables solver output
+    solver_cp.parameters.symmetry_level = 4
+    # solver_cp.parameters.search_branching = cp_model.sat_parameters_pb2.SatParameters.PORTFOLIO_SEARCH
 
     if deterministic_time:
         solver_cp.parameters.random_seed = 42
@@ -834,7 +836,7 @@ BALANCERS = {
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
-                '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
+                '‧‧↿↾↿↾‧‧‧‧↿↾↿↾‧‧' +
                 '▶▶▲▲▲▲◀◀▶▶▲▲▲▲◀◀' +
                 '▲△△▲▲△△▲▲△△▲▲△△▲' +
                 '▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲' +
