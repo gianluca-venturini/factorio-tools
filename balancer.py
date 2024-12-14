@@ -4,6 +4,7 @@ from utils import (
     BELT_INPUT_DIRECTIONS,
     MAX_UNDERGROUND_DISTANCE,
     OPPOSITE_DIRECTIONS,
+    underground_exit_coordinates,
     viz_flows,
     viz_components,
     mixer_can_be_placed,
@@ -330,19 +331,19 @@ def solve_factorio_belt_balancer(
                 solver.Add(ua[i][j] == 0)
                 solver.Add(ub[i][j] == 0)
 
-    # # Ensures that for every entrance there's at least an exit before max distance is reached
-    # # this is necessary to prevent un underground flow longer than MAX_UNDERGROUND_DISTANCE
-    # for i in range(W):
-    #     for j in range(H):
-    #         for d in range(len(DIRECTIONS)):
-    #             solver.Add(
-    #                 sum(
-    #                     ub[ci][cj][d]
-    #                     for n in range(MAX_UNDERGROUND_DISTANCE)
-    #                     for ci, cj in [underground_exit_coordinates(i, j, DIRECTIONS[d], n)]
-    #                     if inside_grid(ci, cj, grid_size))
-    #                     >= 1
-    #                 ).only_enforce_if([ua[i][j], dc[i][j][d]])
+    # Ensures that for every entrance there's at least an exit before max distance is reached
+    # this is necessary to prevent un underground flow longer than MAX_UNDERGROUND_DISTANCE
+    for i in range(W):
+        for j in range(H):
+            for d in range(len(DIRECTIONS)):
+                solver.Add(
+                    sum(
+                        ub[ci][cj][d]
+                        for n in range(MAX_UNDERGROUND_DISTANCE)
+                        for ci, cj in [underground_exit_coordinates(i, j, DIRECTIONS[d], n)]
+                        if inside_grid(ci, cj, grid_size))
+                        >= 1
+                    ).only_enforce_if([ua[i][j], dc[i][j][d]])
 
     # 13. Flow through underground belt
     for i in range(W):
