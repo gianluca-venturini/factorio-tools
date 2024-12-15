@@ -245,7 +245,13 @@ def solve_factorio_belt_balancer(
                     solver.Add(sum(mixer_network[i][j][n] for n in range(num_mixers)) == 1).only_enforce_if([m[i][j], dc[i][j][d]])
 
         for n in range(num_mixers):
-            inputs, outputs = network_solution[n]
+            if len(network_solution[n]) == 2:
+                inputs, outputs = network_solution[n]
+            elif len(network_solution[n]) == 3:
+                inputs, outputs, coordinates = network_solution[n]
+                solver.Add(mixer_network[coordinates[0]][coordinates[1]][n] == 1)
+                solver.Add(m[coordinates[0]][coordinates[1]] == 1)
+
             for i in range(W):
                 for j in range(H):
                     for d in range(len(DIRECTIONS)):
@@ -338,7 +344,7 @@ def solve_factorio_belt_balancer(
             for d in range(len(DIRECTIONS)):
                 solver.Add(
                     sum(
-                        ub[ci][cj][d]
+                        ub[ci][cj]
                         for n in range(MAX_UNDERGROUND_DISTANCE)
                         for ci, cj in [underground_exit_coordinates(i, j, DIRECTIONS[d], n)]
                         if inside_grid(ci, cj, grid_size))
@@ -792,14 +798,14 @@ BALANCERS = {
             (15, 15, 'N', 15, -1),
         ], 1,
             network_solution=(
-                ((0, 0), (1, 1)),
-                ((0, 0), (2, 2)),
-                ((0, 0), (3, 3)),
-                ((0, 0), (4, 4)),
-                ((0, 0), (5, 5)),
-                ((0, 0), (6, 6)),
-                ((0, 0), (7, 7)),
-                ((0, 0), (8, 8)),
+                ((0, 0), (1, 1), (0, 0)),
+                ((0, 0), (2, 2), (2, 0)),
+                ((0, 0), (3, 3), (4, 0)),
+                ((0, 0), (4, 4), (6, 0)),
+                ((0, 0), (5, 5), (8, 0)),
+                ((0, 0), (6, 6), (10, 0)),
+                ((0, 0), (7, 7), (12, 0)),
+                ((0, 0), (8, 8), (14, 0)),
                 ((1, 2), (9, 9)),
                 ((1, 2), (9, 9)),
                 ((3, 4), (10, 10)),
@@ -816,20 +822,18 @@ BALANCERS = {
                 ((11, 12), (14, 14)),
                 ((11, 12), (14, 14)),
                 ((11, 12), (14, 14)),
-                ((13, 14), (15, 15)),
-                ((13, 14), (15, 15)),
-                ((13, 14), (15, 15)),
-                ((13, 14), (15, 15)),
-                ((13, 14), (15, 15)),
-                ((13, 14), (15, 15)),
-                ((13, 14), (15, 15)),
-                ((13, 14), (15, 15)),
+                ((13, 14), (15, 15), (0, 15)),
+                ((13, 14), (15, 15), (2, 15)),
+                ((13, 14), (15, 15), (4, 15)),
+                ((13, 14), (15, 15), (6, 15)),
+                ((13, 14), (15, 15), (8, 15)),
+                ((13, 14), (15, 15), (10, 15)),
+                ((13, 14), (15, 15), (12, 15)),
+                ((13, 14), (15, 15), (14, 15)),
             ),
             solution=
                 '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾' +
-                '▲▲▲▲▲▲▲▲▲▲▲↥↥▲▲▲' +
-                '▲▲▲↥↥▲↥↥↥▲▲◀◀▲↥↥' +
-                '▲▲▲◀↤▲◁↼↤▲◀‧↿↾◁◀' +
+                '▲▲▲▲▲▲▲▲▲▲▲‧‧▲▲▲' +
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
@@ -837,7 +841,9 @@ BALANCERS = {
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
                 '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
-                '‧‧↿↾↿↾‧‧‧‧↿↾↿↾‧‧' +
+                '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
+                '‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧' +
+                '▲‧↿↾↿↾‧‧‧‧↿↾↿↾‧‧' +
                 '▶▶▲▲▲▲◀◀▶▶▲▲▲▲◀◀' +
                 '▲△△▲▲△△▲▲△△▲▲△△▲' +
                 '▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲' +
