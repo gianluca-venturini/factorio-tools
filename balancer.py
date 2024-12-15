@@ -337,6 +337,14 @@ def solve_factorio_belt_balancer(
                 solver.Add(ua[i][j] == 0)
                 solver.Add(ub[i][j] == 0)
 
+    # Helper variables to represent the underground belt exit direction
+    dub = [[[solver.NewBoolVar(f'dub_{i}_{j}_{d}') for d in range(len(DIRECTIONS))] for j in range(H)] for i in range(W)]
+
+    for i in range(W):
+        for j in range(H):
+            for d in range(len(DIRECTIONS)):
+                solver.AddMultiplicationEquality(dub[i][j][d], ub[i][j], dc[i][j][d])
+
     # Ensures that for every entrance there's at least an exit before max distance is reached
     # this is necessary to prevent un underground flow longer than MAX_UNDERGROUND_DISTANCE
     for i in range(W):
@@ -344,7 +352,7 @@ def solve_factorio_belt_balancer(
             for d in range(len(DIRECTIONS)):
                 solver.Add(
                     sum(
-                        ub[ci][cj]
+                        dub[ci][cj][d]
                         for n in range(MAX_UNDERGROUND_DISTANCE)
                         for ci, cj in [underground_exit_coordinates(i, j, DIRECTIONS[d], n)]
                         if inside_grid(ci, cj, grid_size))
@@ -848,7 +856,7 @@ BALANCERS = {
                 '▲△△▲▲△△▲▲△△▲▲△△▲' +
                 '▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲' +
                 '↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾',
-            feasible_ok=True,
+            # feasible_ok=True,
         ),
         '16x16_n_s': lambda:
             solve_factorio_belt_balancer((16, 16), 16, [
