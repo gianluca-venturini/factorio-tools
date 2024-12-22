@@ -54,18 +54,18 @@ def solve_factorio_belt_balancer(
     solver = cp_model.CpModel()
 
     # Decision variables
-    # belt in a direction
+    # belt
     b = [[solver.NewBoolVar(f'b_{i}_{j}') for j in range(H)] for i in range(W)]
-    # mixer in a direction. note that i, j are the left cell of the mixer
+    # mixer. note that i, j are the left cell of the mixer
     m = [[solver.NewBoolVar(f'm_{i}_{j}') for j in range(H)] for i in range(W)]
     # underground belt in a direction
     # entrance
     ua = [[solver.NewBoolVar(f'ua_{i}_{j}') for j in range(H)] for i in range(W)]
     # exit
     ub = [[solver.NewBoolVar(f'ub_{i}_{j}') for j in range(H)] for i in range(W)]
-    # flow of a source in a direction
+    # flow of a source
     f = [[[[solver.NewIntVar(-max_flow, max_flow, f'f_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
-    # underground flow of a source in a direction
+    # underground flow of a source
     uf = [[[[solver.NewIntVar(-max_flow, max_flow, f'uf_{i}_{j}_{s}_{d}') for d in DIRECTIONS] for s in range(num_sources)] for j in range(H)] for i in range(W)]
     # Direction of the component
     dc = [[[solver.NewBoolVar(f'd_{i}_{j}_{d}') for d in DIRECTIONS] for j in range(H)] for i in range(W)]
