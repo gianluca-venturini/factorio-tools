@@ -17,6 +17,10 @@ pip install -r requirements.txt
 ## Run tests
 python -m unittest discover -p '*_test.py'
 
+## Create balancer
+- Define the balancer in `balancer.py` inside the `BALANCERS` object, use the balancer name as object key e.g. 4x4.
+- Find a solution, if it exists, with `python ft.py --solve_balancer=4x4`.
+
 ## Convert blueprints
 echo "my_base64_string_without_first_byte" | base64 -D | zlib-flate -uncompress
 
