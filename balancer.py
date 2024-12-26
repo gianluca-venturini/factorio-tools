@@ -807,7 +807,7 @@ BALANCERS = {
             # '‧▲◀◀△△▶▶▲‧' +
             # '‧‧△↿↾↿↾△‧‧' +
             # '‧‧↿↾↿↾↿↾‧‧',
-            feasible_ok=True,
+            # feasible_ok=True,
         ),
     '8x8_n': lambda:
         solve_factorio_belt_balancer((8, 10), 8, [
