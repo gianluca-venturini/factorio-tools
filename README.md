@@ -7,6 +7,11 @@ To find the optimal solution it uses a combination of CP-SAT solver and optimiza
 
 This is a toy project to teach myself how to iterate on problem solving using a MIP or CP-SAT solvers.
 
+Features implemented are:
+- Define input and output flows on specific cells and set the 2D grid size.
+- Provide fine grain controls: you can fix any component on the 2D grid using the `solution`.
+- Supports optional pre-calculated Banes Network with `solution_network` variable.
+
 ## Install dependencies
 pyenv install 3.9.13
 pyenv global 3.9.13
@@ -18,76 +23,22 @@ pip install -r requirements.txt
 python -m unittest discover -p '*_test.py'
 
 ## Create balancer
-- Define the balancer in `balancer.py` inside the `BALANCERS` object, use the balancer name as object key e.g. 4x4.
-- Find a solution, if it exists, with `python ft.py --solve_balancer=4x4`.
+- Define the balancer in `balancer.py` inside the `BALANCERS` object. Use the balancer name as object key e.g. 4x4. In order to define the balancer design (e.g. grid size, where input and outputs are on the grid) you'll need to pass parameters to `solve_factorio_belt_balancer()` function.
+- Find a solution, if it exists, with e.g. `python ft.py --solve_balancer=4x4`.
 
 ## Convert blueprints
 echo "my_base64_string_without_first_byte" | base64 -D | zlib-flate -uncompress
 
 ### Learnings
-- Underground belts entrances can't be placed between entrance and exit
-
-- Start with MIP model and SCIP
-- Inverting two flows
-    - Optimal solution is 13.
-    - with occupied cell variabe: 1m 3s
-```
-solve_factorio_belt_balancer((5, 6), 2, [
-    (2, 0, 'S', 0, 1),
-    (3, 0, 'S', 1, 1),
-    (3, 5, 'N', 0, -1),
-    (2, 5, 'N', 1, -1),
-])
-```
-- balancer 4x4 is computationally infeasible with naiive MIP model and SCIP
-
-- Adding feasibility mode rather than optimal solution only
-- Discretizing continuous flow into integer flow
-- Migrate to CP-SAT
-- Modeling underground belts with underground flow is more efficient than modeling entrance/exit in a single variable
-    - Migrated undeground representation to lower dimensionality and more constraints
-- Used directly component variables in objective function (-16%)
-    - before: 75s
-    - after 63s
-- use Hint with an order that reflects the likelyhood
-    - 6x6 top 2 rows hidden
-        - optimal
-            - without: (90.8856)
-            - hint: belts=1 (82.0006) -- better
-            - hint: mixers=1 (85.1349) -- better
-            - hint: underground=1 (80.5116) -- best?
-            - hint: belts=1, mixers=1, underground=1 (82.0006) -- better
-        - feasible
-            - without (17.1655)
-            - hint: belts=1 (7.08848) -- better
-            - hint: mixers=1 (23.7942) -- worse
-            - hint: underground=1 (19.2976) -- worse
-            - hint: belts=1, mixers=0 (7.08848) -- better, but identical to previous
-            - hint: belts=1, mixers=1, underground=1 (7.08848) -- better, identical
-            - hint: belts=0, mixers=1, underground=0 (6.49246) -- best
-            - DecisionStrategy belts=1, mixers=0, underground=0: (17.1655) -- identical because IDK how to use it
-    - 6x6 top 2 rows hidden - no underground distance contraints
-        - feasible
-            - without (10.2252)
-            - hint: all_d belts=1 (13.4252)
-            - hint: all_d mixers=1 (17.905)
-            - hint: up belts=1 (7.15802)
-            - hint: up belts=1, mixer=1 (7.15802)
-            - hint: up belts=1, mixer=1, underground=1 (7.15802)
-    - 6x6 top 4 rows hidden
-        - feasible
-            - without (3787.97)
-            - hint: belts=1 (1475.37) -- 
-            - hint: mixers=1 (767.999) -- best for some reason
-            - hint: belts=1, mixers=1, underground=1 (1475.37) -- 
-            - hint: belts=1, mixers=0, underground=0 (1475.37) -- 
-            - hint: belts=0, mixers=1, underground=0 (767.999) --
-
-- Supplying pre-solved network increases performance drastically
-
-
+[I wrote a blog post about it](https://gianlucaventurini.com/posts/2024/factorio-tools)
 
 ## Notable solutions
+
+- 3x3 balancer
+```
+0eJydltmOgyAUhl+l4dpOZOnmZV9jMploe9KQUCSAE5vGdx/UprNAA3hlkHO+s/Gjd9SIDpTm0qLqjriFK6p+vSuQqBsQ7t0RhF01tajlCfTKbfBTKw2q3u/I8Iusxehvbwqc7YQpkKyv48rqWhrVart2JIsG5yrP0KMKDx8FAmm55TCTpsXtU3bXBrQzeDKgVxqMWXfOU190654zrUCqNQ7QyjF+P/ncUFW6KI9k2s6qbjQ8cw2n2dJte8GIF8wowa11e14Q8rZ5holgqYf91w8PXk5o/BdNAmiWjcap6E02moTQoYZsFwyVPuGZQ90t7D6J17FffDjJTx1cJpVxWDgOEp80LrPZNJntCzjGZiE2C7F9vaaNlsZHi33Rvr4L8OMuSOH6ik09+zT7zOB8DbNQIcHm+yJOaz5LaFK+ZnEy2xdt/JJP4eYLlIXYoV4TX6Cvcy4fOW/iOZN8cZJkdr44aTI7/4vKQuzt+PfxBdrM19ces92B7LaUMUrKYfgGVN8VJw==
+```
+
 - 4x4 balancer
 ```
 ↥↿↾↥
@@ -97,6 +48,10 @@ solve_factorio_belt_balancer((5, 6), 2, [
 ↥▲◀◀
 △△△▲
 ↿↾↿↾
+```
+
+```
+0eJydltFugyAUhl+l4douAmpbL/cay7Joe9KQUCSAS5vGd9+xNqYrNgVuNAp8n3j40StpZQ/aCOVIfSXCwYnUD/cyIpsWJN77BOlWbSMbtQezwgax75Ql9deVWHFUjRzHu4sG7HvDZEQ1p/HKmUZZ3Rm3RpIjAw5VBziTmg7fGQHlhBMwkW4Xlx/Vn1ow2GFmwFkbsHbd40hzNB2eJ1pGdGcR0KnRj9A8Ixc8ouX+MF3vdD92PAgD+6knNnsy5smslsI5bPMk9KOcNW+wPGEOPHUORYKM3mQ0XlYmyFiqrEp+jQ8yoYJcm+Rlx6JdW8/1FJcX9WL/Vx5bQO+i0SwUTfNoNl9iL70R6qf+dRDzexB5ANcPeGhZi/j1Sv3chxW2CJiJH/Owyj6xqyW2n+qwyoawU0I8VaCMDhZNSTFNlfkxDt0LE2Txweaz6t1H0A/2+/BVAdyYULNXXPxd+AVjp21pS4vNjm0qXhSc5cPwB6A++ck=
 ```
 
 - 6x6 balancer on 8x9 grid feasible in 3min
@@ -112,7 +67,12 @@ solve_factorio_belt_balancer((5, 6), 2, [
 ↿↾↿↾↿↾‧‧
 ```
 
-- 8x8 balancer on 8x10 grid feasible in 30min
+Blueprint
+```
+0eJydmNtuozAQQH+l8jNdgW9cHvsbq6oiqVUhEYPArBpF+fc6IULbeBLP+CkiwLFn7OOxObFdv5hx6qxjzYl1zhxY899/Gevbnen9f2+mdy+7tm/t3kwv/ka3H+zMmr8nNndftu0v77vjaPyzV0zGbHu4XLmptfM4TO7Vkxw7+1ftp/lmTXF+z5ixrnOdWUnXi+OHXQ47M/kHNob5Hiczz6/z2HfO+XsZG4fZvzjYS7sexv+ojB1Zk3v+ZzeZ/XrPXwZYTsBKPFYQsBqPlQH2LqEBvLiii99oDqAVGc0hNNRrTUiGuCUDgS3JPUajqwC9+Gk6fU2D/30A1xv8NvOHxY3L5cFIY3VCY2VqY0WeOIV4PGtF6Gg8Er7Rn0SiodZCdWORCHQkob/xSCQmErA1utYKHQndaw2xwREIxY6xSzQ7tDs+AtX9CHQWN5VC32OB1OhAQr1xC6uIr9mcLrOA2GBhDGXGDS6GTVe3gthQvnmoLm4sMf2mi5pf2fI3W0LsUNT4hC82OnHx5KG62KU60hqYtxSZ5X1rSJk5XWYFDRLITq/VzwMB95B0uysoEJBNt7tGs+l2r5aouCWCbneBZtPt5hAbmjiCXoYFxIaqgEhxWW70x5MSbCx1160QEyd9262eL0pgJPTCXGIjkanqYtip6mLYlONwfjuq6bhaknIe5jAX7G/qzhnDDpV93OeK0Gf6rnldHktEnul2FhAb8kXS6yqH2GBO6C4KLFvRXVRodsqJV2902n5A0etqiR1cRa+rFTpJdElrNJteV1eZKkROUupqsdFpdVWlbJE5ojEwa3SVBZQ1kJ2yRZaJgejQ7cdrtLqt0YggdOrhF8MONcZ+2ajouxydehzGRBKKHa/qNYJLqbySwKV8iNaPuO8Z+2emec14Vciy5qUWUgqen88/jQ+Q6Q==
+```
+
+- 8x8 balancer on 8x10
 ```
 ↿↾↿↾↿↾↿↾
 ↥↥▲↥↥↥↥↥
@@ -126,47 +86,11 @@ solve_factorio_belt_balancer((5, 6), 2, [
 ↿↾↿↾↿↾↿↾
 ```
 
-- new underground belt design in 15min
 ```
-↿↾↿↾↿↾↿↾
-↥↥↥▲↥↥↥▲
-‧▶▷▲◀◀↦▲
-△▲◀‧△▲◀◀
-▲↤▲▶▲◁◀▲
-‧‧↿↾‧‧↿↾
-▶▶▲↥▶▶▲↥
-↥△△‧↥△△‧
-△↿↾△△↿↾△
-↿↾↿↾↿↾↿↾
+0eJydmNtu4jAQhl+l8nW6IrZjA5f7GqtqFahVWQpO5DirIsS7ryEVexgLz8xVFJJ8P3P4fbqIw7C4KfqQxP4ifHInsf/rt0YM/cEN+bfvbkgvh37ow9HFl/zAH8cwi/2Pi5j9R+iH2/fpPLn87h3TiNCfbncp9mGexpheMymJa/40vLtPsW+vb41wIfnk3Uq635x/huV0cDG/8GC4zym6eX6dp8GnlJ81Yhrn/OEYbroZtvnWNeKcr5n/7qM7rs/yLcBKAlbisYqA1XisJmANHtsB7JKrEj/imK9rpWCO7/A2w78KPS5pWm4vVsQMQ6zlilmGmOSKbYHYf+0OpNRDqoLeMeLQ3DjaDUOtY6tBZ9fVDFsNGr5WJIstUgtdX2OvjS3/ZcsSG1of28nyT5Z8AEkqisEBAdfJEpEk6P8aW5fYpsSGdq+xOzQbuhvbpvJ5mxYrAA2Pa1NEBSTH3utwr562UlEMuhvnCYUIhO5lWWKXyi2hl7EjLiNJ0Ny4vsUkie5lg04S3csWzaZ7ee1RjcgJx8vtg/7Ey8VI6F6W2EgU9DJupNb1KUfRravR/xtaF7vE0E/tVSqAos/LphRIkU23rkUnCVq3vjnpEFxo2/o2AsPlWtYgmpG+uG7RbK5BTT0nmjPZqgeduLrVXMsisqTps22HZnMdiqkAZ+Vs2RXg76UtQ42/mbbkVYrmb6YZYpwpWrPzyNlfd8zQOs6QYLhinN312o9buhjlNK39mli2iPMpzmJccYPgjBeaK0aZ4jtCxjgDg+UGAQeG+tnsDhEEHAPq6x8MF7q9fjqL4Bpo7Pq6CnDfGvHLxXmdK7ettjtpjdJayc31+hsxzQHI
 ```
 
-- with feasible solution fixing two rows and 2 cells finds solution in 83s
-- with feasible solution fixing two rows and 2 cells and hint to uf=0 finds solution in 17s (7.85157)
-    - hint belts -- worse
-    - hint mixers
-
-- with pre-computed graph feasible solution no fixed rows in 70s
-- found 16x16 with hints, symmetry breaking in 1:30h
-- found 16x16 with hints, symmetry breaking and objective function in 55min
-hints
-```
-↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾
-▲▲▲▲▲▲▲▲▲▲▲‧‧▲▲▲
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧‧
-▲‧↿↾↿↾‧‧‧‧↿↾↿↾‧‧
-▶▶▲▲▲▲◀◀▶▶▲▲▲▲◀◀
-▲△△▲▲△△▲▲△△▲▲△△▲
-▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲
-↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾
-```
+- 16x16 balancer on 16x16
 
 ```
 ↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾
@@ -186,3 +110,17 @@ hints
 ▲↿↾▲▲↿↾▲▲↿↾▲▲↿↾▲
 ↿↾↿↾↿↾↿↾↿↾↿↾↿↾↿↾
 ```
+
+```
+0eJylnN1u2zgQhV+l0LUbaEjqL5d9jUWxcFKhMODIhiwvGgR591Vix901p9Y5J1eBE+ebkDOHHFLHeSketsd+P26Gqbh/KTZT/1Tc/+d7q2K7fui38/e+9dvpy8N6ux4e+/HL/IPN4244FPd/vRSHzc9hvX37/el538/vfcesimH99PZqGtfDYb8bp68zaSpe518dfvS/int7/b4q+mHaTJv+RHp/8fz3cHx66Mf5DRdG/2s/9ofD18N+u5mm+WerYr87zL+4G97izrDyrloVz/PXmf9jM/aPp5/NLzNsILABx0YCm3BsIrA1jq0IbItjawJrRM4ahkskrWW4RNa6jHslg7yA39G2jLaSZhvMziW3xA4wO9fdEjvC7Fx8S+wEs3MFLrErmJ3LcIldw+xci0vsBmbnelxitzA71+QSu4PZvC4NFmbIhXmcd7rx57ibv/4J/1ub591zd5z2x7d3LoXLtQqEC3I4Xr4G6zfw+jVYwIEXsMEKDrmCl7NwKqkgJCHXNJBzOVqu8uVoQY7G7MXxvBUHIEO85mF2VCRfqzMUFcU3crRc8MvRWjlavgIsR+vkaMKSUMJFwW/qZh689uD8rm4BhlNtNqHBmGsbWLcqOb1q+x3/P5TgncfU9hthKwIPF/rH8XvIJskNpug7XgdDU5IUfSc5mtqzx+VaTmrPHpcFmNSeHWGrPTvCVnt2hC337AC8+kTPvlCXnuYq/nxtAS3MSu7QEbjcoSNwuUNHUszr9VQ+CfjD9X483Vyw3WB6Oy4E4xVdebPmqiBXNNo13x6IF6xWFN6Ks1YrG3inBhP0Dld2Leg9oAVQC3qP8F+unMjPa1Xil/RaaMhdpbhjYRryj+v0CuDy6g4wm9+vo8f21vJGEXO60G+k1o2mqLlCormPOJR+vL6OBq4dDS/vxkuSp4iGV3eLFlfDPLfqcEE08rEagSsbt0UgtW7V8tq2BAtQ2bot0wRYpS1/1j5tcDXw5E+6Pr/QSXG3/F4dvJF4emuVo3W8HgnYTrXK82gkHcqu3cnpEOSOV5Ykd6i03IwIendryx1LrnfgATkA7lRpNwBbl3bDdwmdsm8HJJo7NkXstRyN38obOEuK4tvrkYCbYscLvvMG4rL5izXDa1lQt8F/uXC1FlC4lcJNecTpksiTqgQrhdN2hWbZSr4fPyWiXe4PrMxVjDYILd0gWKnour6Ohu5+VqpX5i2SFl7aHQ4XpF3iSZc6dVOz7rjS4DPOQtp9o9on5K+UmeBeO8sfKQXBv3aSf4fA1YdhHVBmjoMNVXsnVJly394A0fyJUxr59joaXmLqQzSoCKTloEQG45s9P/FgTUjVZ8xwSjil5z8bCUshnLo8GGBVNscfh7YH0mCUFSPp4fj+oCLmjm8QGoIuW2FLoIMWjHFW4njHG3fj6sDuiFl3jHCoF7UE9jTH+Ya6USG88GjNn5zk4vnt/pxVyGgvPV37zScvV8zxuy1/WgcbCfNsLVFkxe3WZHMEXm2Y43a78VmecyHdAZf95njd0EtZKdmO/w34+BCUE8ftBnyCCEMrV3IfC4aQb8HcZv5wfLzql7EALH6Cw80IOr8dB5fuJ5rfjiNB57fjhNMdoxvYBkF0fkOuXbpbkYKxrSHo/Hbc4hUpWNs6gi5YzX2x+mkVxOqr1ccLF+eEXAULmxF6dVxsaJeIlKXjW0NXeQjPK/ZcOICf0xxrGtwl3nay++GUHTjo4XhNR2LueE0ngq7coFX6VClXaLUejpd8Q8wdr/gWp0vetk6eKsncZqUeTzhUGzF7sl8Vwyt3ZBb12fqEiVWKJ7tYsenjd/pzpQEmWXMcbzfOdh9HO4iselkhumBvSwSdOUxXzKwIZraGoMv9OERn/GsdNSvyxz4xvOxQxfDSRz8xtNCHM3jm+utyZwTYds3xqAF3jxCZ0WaiyMw9V02RmX9w1FJkRpPGpZDxixuXQ+p/Hf05id9XxT/9eDgd8ltLTReaOqYUQ/n6+i8RQH96
+```
+
+
+### Blog post notes
+Measurements in the blog post table are made on these commits
+
+CP-SAT: 82d9734faa62195a59941d9318516266bbca50ba
+CP-SAT Banes Networks: 8637ff8d38e5acb2f1e62b2c5040aa65bd44b946
+CP-SAT Banes Networks, direction optimized: 81cd1a99820d1af18321359722dd461f16437d98
+
+ffmpeg -i 3_3.mov -t 1 -vf "fps=40,scale=640:-1:flags=lanczos" -c:v libwebp -compression_level 6 -q:v 20 -loop 0 3_3-2.webp
