@@ -13,21 +13,35 @@ Features implemented are:
 - Supports optional pre-calculated Banes Network with `solution_network` variable.
 
 ## Install dependencies
+
+```
 pyenv install 3.9.13
 pyenv global 3.9.13
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
 
 ## Run tests
+
+```
 python -m unittest discover -p '*_test.py'
+```
 
 ## Create balancer
-- Define the balancer in `balancer.py` inside the `BALANCERS` object. Use the balancer name as object key e.g. 4x4. In order to define the balancer design (e.g. grid size, where input and outputs are on the grid) you'll need to pass parameters to `solve_factorio_belt_balancer()` function.
-- Find a solution, if it exists, with e.g. `python ft.py --solve_balancer=4x4`.
 
-## Convert blueprints
+Define the balancer in `balancer.py` inside the `BALANCERS` object. Use the balancer name as object key e.g. 4x4. In order to define the balancer design (e.g. grid size, where input and outputs are on the grid) you'll need to pass parameters to `solve_factorio_belt_balancer()` function.
+Find a solution, if it exists, with e.g. 
+
+```
+python ft.py --solve_balancer=4x4
+```
+
+## Decode blueprints
+
+```
 echo "my_base64_string_without_first_byte" | base64 -D | zlib-flate -uncompress
+```
 
 ### Learnings
 [I wrote a blog post about it](https://gianlucaventurini.com/posts/2024/factorio-tools)
