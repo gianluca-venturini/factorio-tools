@@ -50,22 +50,31 @@ echo "my_base64_string_without_first_byte" | base64 -D | zlib-flate -uncompress
 
 - 3x3 balancer
 ```
+‧↥↿↾‧
+▶▶▲↥‧
+▲△▶▶▼
+▲↿↾△▼
+▲▲↿↾▼
+↿↾▲▲◀
+```
+
+```
 0eJydltmOgyAUhl+l4dpOZOnmZV9jMploe9KQUCSAE5vGdx/UprNAA3hlkHO+s/Gjd9SIDpTm0qLqjriFK6p+vSuQqBsQ7t0RhF01tajlCfTKbfBTKw2q3u/I8Iusxehvbwqc7YQpkKyv48rqWhrVart2JIsG5yrP0KMKDx8FAmm55TCTpsXtU3bXBrQzeDKgVxqMWXfOU190654zrUCqNQ7QyjF+P/ncUFW6KI9k2s6qbjQ8cw2n2dJte8GIF8wowa11e14Q8rZ5holgqYf91w8PXk5o/BdNAmiWjcap6E02moTQoYZsFwyVPuGZQ90t7D6J17FffDjJTx1cJpVxWDgOEp80LrPZNJntCzjGZiE2C7F9vaaNlsZHi33Rvr4L8OMuSOH6ik09+zT7zOB8DbNQIcHm+yJOaz5LaFK+ZnEy2xdt/JJP4eYLlIXYoV4TX6Cvcy4fOW/iOZN8cZJkdr44aTI7/4vKQuzt+PfxBdrM19ces92B7LaUMUrKYfgGVN8VJw==
 ```
 
 - 4x4 balancer
 ```
-↥↿↾↥
-‧↥↥△
-△▶▶▲
-↿↾‧‧
-↥▲◀◀
-△△△▲
 ↿↾↿↾
+▲↿↾▲
+▲↥↥▲
+▲◀◀▲
+‧‧↿↾
+▶▶▲▲
+▲△△▲
 ```
 
 ```
-0eJydltFugyAUhl+l4douAmpbL/cay7Joe9KQUCSAS5vGd9+xNqYrNgVuNAp8n3j40StpZQ/aCOVIfSXCwYnUD/cyIpsWJN77BOlWbSMbtQezwgax75Ql9deVWHFUjRzHu4sG7HvDZEQ1p/HKmUZZ3Rm3RpIjAw5VBziTmg7fGQHlhBMwkW4Xlx/Vn1ow2GFmwFkbsHbd40hzNB2eJ1pGdGcR0KnRj9A8Ixc8ouX+MF3vdD92PAgD+6knNnsy5smslsI5bPMk9KOcNW+wPGEOPHUORYKM3mQ0XlYmyFiqrEp+jQ8yoYJcm+Rlx6JdW8/1FJcX9WL/Vx5bQO+i0SwUTfNoNl9iL70R6qf+dRDzexB5ANcPeGhZi/j1Sv3chxW2CJiJH/Owyj6xqyW2n+qwyoawU0I8VaCMDhZNSTFNlfkxDt0LE2Txweaz6t1H0A/2+/BVAdyYULNXXPxd+AVjp21pS4vNjm0qXhSc5cPwB6A++ck=
+0eJydlttuwyAMhl+l4jqdCiRpl8u9xjRNSWtVSJQgIFOrKu8+p+m6A5licoXA8Nmx+U2urNEdWKdMYNWVqQAnVv1Yy5iuG9C49gI6rJpa12YPboUGtW+NZ9XrlXl1NLUezoeLBdx7w2TM1KdhFlxtvG1dWCMpsB6PmgOcWcX7t4yBCSooGEm3yeXddKcGHG54MOBsHXi/9larENCWMdt6PNiawS/CNk9Fxi44Iv+gHOxHG04jrEjACjpWRtg/Xx7HfEPzeXSeEDG/R0zAFskRSyq6XJgMMY/eRugO75M7uhbHf+D8Ab9f0bYLths2zjjbLXAmljp7XlgPQtL4ZmFBJIEd63SOzafY5RQ7FuscW5DZ6YqV5JykSParyeQEbrpmxzoWv9liip0uWk5mx6ql1bEg5CQWKa2OFHa6Jsd8l4R3KNYktZOV381FGVJvEbFIqZ1sgbN01crprOEfwgc4P96rHc+3z2JbyjyXYtP3nwBV9c4=
 ```
 
 - 6x6 balancer on 8x9 grid feasible in 3min
